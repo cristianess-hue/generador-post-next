@@ -118,7 +118,7 @@ def extraer_datos_inmueble(url):
     return og_title, og_desc, body_text, imagenes
 
 # ==========================================
-# ESTRUCTURACIÓN CON IA (DATOS + TEXTO COMERCIAL)
+# ESTRUCTURACIÓN CON IA (DATOS + COPY)
 # ==========================================
 
 def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel):
@@ -424,7 +424,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     return buf.getvalue()
 
 # ==========================================
-# INICIALIZACIÓN DE ESTADO (PERSISTENCIA TOTAL)
+# INICIALIZACIÓN DE ESTADO
 # ==========================================
 
 if "datos_extraidos" not in st.session_state:
@@ -468,7 +468,6 @@ if st.button("🔍 Extraer Propiedad y Fotos", type="primary"):
                 st.session_state.datos_extraidos = datos
                 st.session_state.fotos_extraidas = fotos
                 st.session_state.copy_publicitario = datos.get("copy_publicitario", "")
-                # Limpiar resultado previo al extraer una nueva propiedad
                 st.session_state.img_generada = None
                 st.session_state.nombre_descarga = ""
                 
@@ -483,11 +482,16 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
     st.markdown("---")
     st.subheader("📸 Selecciona las 4 fotos para el post:")
 
+    # Cuadrícula ordenada estricta (funciona igual en PC y celular)
     fotos = st.session_state.fotos_extraidas
-    cols_preview = st.columns(min(6, len(fotos)))
-    for idx, f_url in enumerate(fotos):
-        with cols_preview[idx % 6]:
-            st.image(f_url, caption=f"Foto #{idx + 1}", use_container_width=True)
+    num_cols = 3
+    for fila_idx in range(0, len(fotos), num_cols):
+        bloque_fotos = fotos[fila_idx : fila_idx + num_cols]
+        cols_fila = st.columns(num_cols)
+        for c_idx, f_url in enumerate(bloque_fotos):
+            numero_foto = fila_idx + c_idx + 1
+            with cols_fila[c_idx]:
+                st.image(f_url, caption=f"Foto #{numero_foto}", use_container_width=True)
 
     opciones = list(range(1, len(fotos) + 1))
 
@@ -521,7 +525,6 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
             nombre_base = f"{tipo_limpio} en {colonia_limpia} {precio_limpio}"
             nombre_archivo = f"{re.sub(r'[\\/*?:\"<>|]', '', nombre_base).strip()}.jpg"
 
-            # Guardar en session_state para evitar borrado tras descargar
             st.session_state.img_generada = img_resultado
             st.session_state.nombre_descarga = nombre_archivo
 
