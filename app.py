@@ -217,49 +217,43 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     lienzo = PILImage.new("RGB", (ancho, alto), (255, 255, 255))
     draw = ImageDraw.Draw(lienzo)
 
-    # Tipografía grande, legible y con peso visual
-    font_titulo = cargar_fuente(46, bold=True)
-    font_tipo = cargar_fuente(32, bold=True)
-    font_operacion = cargar_fuente(40, bold=True)
-    font_precio = cargar_fuente(50, bold=True)
+    # Tipografías proporcionadas y de alto impacto
+    font_colonia = cargar_fuente(50, bold=True)
+    font_tipo = cargar_fuente(34, bold=True)
+    font_operacion = cargar_fuente(42, bold=True)
+    font_precio = cargar_fuente(52, bold=True)
     font_moneda = cargar_fuente(22, bold=True)
     
-    font_datos_num = cargar_fuente(36, bold=True)
+    font_datos_num = cargar_fuente(38, bold=True)
     font_datos_lbl = cargar_fuente(18, bold=True)
     
-    font_pie_bold = cargar_fuente(34, bold=True)
-    font_pie_tel = cargar_fuente(34, bold=True)
-    font_pie_sub = cargar_fuente(19, bold=False)
-    font_lema = cargar_fuente(17, bold=False)
+    # Bloque inferior asesor (más grande y legible)
+    font_pie_nombre = cargar_fuente(40, bold=True)
+    font_pie_tel = cargar_fuente(38, bold=True)
+    font_pie_cargo = cargar_fuente(22, bold=False)
+    font_pie_lema = cargar_fuente(20, bold=False)
 
     ROJO_NEXT = (227, 6, 19)
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. COLUMNA IZQUIERDA (ENCABEZADO Y PRECIO)
-    cx_izq = 165
+    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS
+    # Las fotos van desde X=330 hasta X=1170 (ancho total: 840 px). Centro exacto: X=750
+    cx_fotos = 750
     colonia = datos.get("colonia", "PROPIEDAD").upper().strip()
+    draw.text((cx_fotos, 60), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
 
-    palabras = colonia.split()
-    if len(palabras) > 2 and len(colonia) > 16:
-        linea_a = " ".join(palabras[:2])
-        linea_b = " ".join(palabras[2:])
-        draw.text((cx_izq, 70), linea_a, fill=ROJO_NEXT, font=font_titulo, anchor="mm")
-        draw.text((cx_izq, 120), linea_b, fill=ROJO_NEXT, font=font_titulo, anchor="mm")
-        y_cursor = 175
-    else:
-        draw.text((cx_izq, 80), colonia, fill=ROJO_NEXT, font=font_titulo, anchor="mm")
-        y_cursor = 150
+    # 2. COLUMNA IZQUIERDA (TIPO, OPERACIÓN Y PRECIO)
+    cx_izq = 165
+    draw.text((cx_izq, 85), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
+    draw.text((cx_izq, 135), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
+    draw.text((cx_izq, 195), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
+    draw.text((cx_izq, 235), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
 
-    draw.text((cx_izq, y_cursor), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
-    draw.text((cx_izq, y_cursor + 55), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
-    draw.text((cx_izq, y_cursor + 115), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
-    draw.text((cx_izq, y_cursor + 155), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
-
-    y_linea = y_cursor + 185
+    y_linea = 265
     draw.line([(30, y_linea), (300, y_linea)], fill=GRIS_LINEA, width=2)
 
-    # 2. ESPECIFICACIONES CON ICONOS
+    # 3. ESPECIFICACIONES CON ICONOS
     # Fila 1: Recámaras y Estacionamiento
     y_r1 = y_linea + 55
     rec_val = str(datos.get("recamaras", "-")) or "-"
@@ -290,7 +284,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     y_sep2 = y_r2 + 115
     draw.line([(30, y_sep2), (300, y_sep2)], fill=GRIS_LINEA, width=2)
 
-    # Fila 3: Terreno (SOLO SI EXISTE)
+    # Fila 3: Terreno (SOLO SI TIENE INFORMACIÓN)
     terreno_val = str(datos.get("terreno", "")).strip()
     if terreno_val and terreno_val not in ["0", "-", ""]:
         y_r3 = y_sep2 + 55
@@ -299,7 +293,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
         pegar_icono(lienzo, "terreno", cx_izq, y_r3 + 70, max_size=52)
         draw.line([(30, y_r3 + 115), (300, y_r3 + 115)], fill=GRIS_LINEA, width=2)
 
-    # 3. 4 FOTOS EN ALTA RESOLUCIÓN
+    # 4. 4 FOTOS EN ALTA RESOLUCIÓN
     x_col1 = 330
     x_col2 = 765
     y_fila1 = 110
@@ -319,12 +313,12 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 4. TARJETA INFERIOR DEL ASESOR
+    # 5. TARJETA INFERIOR DEL ASESOR
     foto_ruta = asesor_datos.get("foto", "")
     if foto_ruta and os.path.exists(foto_ruta):
         try:
             foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
-            foto_asesor.thumbnail((180, 200), PILImage.Resampling.LANCZOS)
+            foto_asesor.thumbnail((185, 205), PILImage.Resampling.LANCZOS)
             draw.rounded_rectangle([(35, 930), (225, 1150)], radius=14, outline=(254, 205, 211), width=4)
             px = int(35 + (190 - foto_asesor.width) / 2)
             py = int(930 + (220 - foto_asesor.height) / 2)
@@ -332,14 +326,14 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
         except Exception:
             pass
 
-    # 5. CONTACTO CENTRAL INFERIOR
+    # 6. CONTACTO CENTRAL INFERIOR (AMPLIADO Y LEGIBLE)
     cx_contacto = 570
-    draw.text((cx_contacto, 990), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_bold, anchor="mm")
-    draw.text((cx_contacto, 1035), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
-    draw.text((cx_contacto, 1075), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_sub, anchor="mm")
-    draw.text((cx_contacto, 1115), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_lema, anchor="mm")
+    draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
+    draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
+    draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
+    draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
 
-    # 6. LOGO NEXT EN ESQUINA INFERIOR DERECHA
+    # 7. LOGO NEXT EN ESQUINA INFERIOR DERECHA
     if os.path.exists(LOGO_PATH):
         try:
             logo = PILImage.open(LOGO_PATH).convert("RGBA")
