@@ -29,12 +29,14 @@ ASESORES = {
     }
 }
 
+# Diccionario flexible: busca tanto el nombre descriptivo como el número directo
 ICONOS = {
-    "recamaras": "ico_cama.png",
-    "estac": "ico_auto.png",
-    "banos": "ico_bano.png",
-    "pisos": "ico_pisos.png",
-    "terreno": "ico_terreno.png"
+    "recamaras": ["ico_cama.png", "1.png"],
+    "banos": ["ico_bano.png", "2.png"],
+    "pisos": ["ico_pisos.png", "3.png"],
+    "estac": ["ico_auto.png", "4.png"],
+    "construccion": ["ico_const.png", "5.png"],
+    "terreno": ["ico_terreno.png", "6.png"]
 }
 
 # ==========================================
@@ -130,31 +132,33 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
     Texto: {body_text[:6000]}
 
     Instrucciones estrictas:
-    1. 'colonia': Nombre del fraccionamiento o colonia (ej: "PRAGA RESIDENCIAL", "JARDÍN REAL", "MONTECARLO").
-    2. 'tipo_inmueble': "Casa", "Departamento", "Local Comercial", "Oficina" o "Terreno".
+    1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "PRAGA RESIDENCIAL", "SANTA FE", "MONTECARLO").
+    2. 'tipo_inmueble': "Casa", "Departamento", "Oficina", "Local Comercial", "Bodega" o "Terreno".
     3. 'operacion': "Renta" o "Venta".
-    4. 'precio': El precio con formato (ejemplo: "$10,000", "$3,580,000").
+    4. 'precio': El precio con formato SIN CENTAVOS (ej: "$10,000", "$3,100,000"). NUNCA pongas .00.
     5. 'moneda': "MXN" o "USD".
-    6. 'recamaras': Número (ej: "2" o "3"). Si no se menciona, pon "".
-    7. 'estacionamiento': Número de autos (ej: "1" o "2"). Si no se menciona, pon "".
-    8. 'banos': Número (ej: "1", "2" o "2.5"). Si no se menciona, pon "".
-    9. 'pisos': Número de plantas (ej: "1" o "2"). Si no se menciona, pon "1".
-    10. 'terreno': Únicamente los m² de terreno si están EXPLÍCITAMENTE en el texto (ej: "128"). Si es renta, departamento o no existe terreno, DEBE SER VACÍO "".
-    11. 'nombre_archivo': EXACTAMENTE con este formato: "[tipo_inmueble] en [colonia] [precio]" (ej: "Departamento en Praga Residencial $10,000" o "Casa en Montecarlo Residencial $3,580,000"). Sin caracteres especiales como / \\ : * ? " < > |.
+    6. 'recamaras': Número (ej: "2" o "3"). Si NO tiene o no se menciona, pon "".
+    7. 'estacionamiento': Número de autos (ej: "1", "2", "3"). Si NO tiene o no se menciona, pon "".
+    8. 'banos': Número (ej: "1", "2" o "2.5"). Si NO tiene o no se menciona, pon "".
+    9. 'pisos': Número de niveles o pisos (ej: "1", "2"). Si NO tiene o no se menciona, pon "".
+    10. 'construccion': Número de m² de construcción si se menciona (ej: "192", "71"). Si NO tiene, pon "".
+    11. 'terreno': Número de m² de terreno si se menciona (ej: "148", "250"). Si NO tiene, pon "".
+    12. 'nombre_archivo': EXACTAMENTE "[tipo_inmueble] en [colonia] [precio]" (ej: "Oficina en Santa Fe $3,100,000"). Sin caracteres ilegales como / \\ : * ? " < > |.
 
     Devuelve un JSON estrictamente válido:
     {{
-      "colonia": "PRAGA RESIDENCIAL",
-      "tipo_inmueble": "Departamento",
-      "operacion": "Renta",
-      "precio": "$10,000",
+      "colonia": "SANTA FE",
+      "tipo_inmueble": "Oficina",
+      "operacion": "Venta",
+      "precio": "$3,100,000",
       "moneda": "MXN",
-      "recamaras": "2",
-      "estacionamiento": "1",
-      "banos": "1",
-      "pisos": "1",
+      "recamaras": "",
+      "estacionamiento": "3",
+      "banos": "",
+      "pisos": "",
+      "construccion": "71",
       "terreno": "",
-      "nombre_archivo": "Departamento en Praga Residencial $10,000"
+      "nombre_archivo": "Oficina en Santa Fe $3,100,000"
     }}
     """
     modelos = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']
@@ -197,10 +201,16 @@ def descargar_y_recortar(url, target_w, target_h):
     return img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
 
 def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=52):
-    ruta = ICONOS.get(clave_icono)
-    if ruta and os.path.exists(ruta):
+    nombres_posibles = ICONOS.get(clave_icono, [])
+    ruta_encontrada = None
+    for nom in nombres_posibles:
+        if os.path.exists(nom):
+            ruta_encontrada = nom
+            break
+
+    if ruta_encontrada:
         try:
-            ico = PILImage.open(ruta).convert("RGBA")
+            ico = PILImage.open(ruta_encontrada).convert("RGBA")
             ico.thumbnail((max_size, max_size), PILImage.Resampling.LANCZOS)
             px = int(x_centro - (ico.width / 2))
             py = int(y_centro - (ico.height / 2))
@@ -220,7 +230,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     font_colonia = cargar_fuente(50, bold=True)
     font_tipo = cargar_fuente(34, bold=True)
     font_operacion = cargar_fuente(42, bold=True)
-    font_precio = cargar_fuente(52, bold=True)
     font_moneda = cargar_fuente(22, bold=True)
     
     font_datos_num = cargar_fuente(38, bold=True)
@@ -235,73 +244,110 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS (CON ESPACIO AIREADO)
+    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS
     cx_fotos = 750
     colonia = datos.get("colonia", "PROPIEDAD").upper().strip()
     draw.text((cx_fotos, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
 
-    # 2. COLUMNA IZQUIERDA (DISTRIBUCIÓN VERTICAL ADAPTATIVA)
-    cx_izq = 165
-    terreno_val = str(datos.get("terreno", "")).strip()
-    tiene_terreno = bool(terreno_val and terreno_val not in ["0", "-", ""])
+    # 2. FILTRAR ÚNICAMENTE CARACTERÍSTICAS VÁLIDAS
+    caracteristicas_validas = []
 
-    if tiene_terreno:
+    def es_valido(v):
+        s = str(v).strip()
+        return s and s not in ["-", "0", "None", "null"]
+
+    if es_valido(datos.get("recamaras")):
+        caracteristicas_validas.append({"clave": "recamaras", "valor": str(datos.get("recamaras")).strip(), "label": "RECAMARAS"})
+    if es_valido(datos.get("estacionamiento")):
+        caracteristicas_validas.append({"clave": "estac", "valor": str(datos.get("estacionamiento")).strip(), "label": "ESTAC."})
+    if es_valido(datos.get("banos")):
+        caracteristicas_validas.append({"clave": "banos", "valor": str(datos.get("banos")).strip(), "label": "BAÑOS"})
+    if es_valido(datos.get("pisos")):
+        caracteristicas_validas.append({"clave": "pisos", "valor": str(datos.get("pisos")).strip(), "label": "PISOS"})
+    if es_valido(datos.get("construccion")):
+        caracteristicas_validas.append({"clave": "construccion", "valor": str(datos.get("construccion")).strip(), "label": "CONST. m2"})
+    if es_valido(datos.get("terreno")):
+        caracteristicas_validas.append({"clave": "terreno", "valor": str(datos.get("terreno")).strip(), "label": "TERRENO m2"})
+
+    filas_specs = []
+    idx_spec = 0
+    while idx_spec < len(caracteristicas_validas):
+        if idx_spec + 1 < len(caracteristicas_validas):
+            filas_specs.append([caracteristicas_validas[idx_spec], caracteristicas_validas[idx_spec + 1]])
+            idx_spec += 2
+        else:
+            filas_specs.append([caracteristicas_validas[idx_spec]])
+            idx_spec += 1
+
+    # 3. DISTRIBUCIÓN VERTICAL EQUILIBRADA EN COLUMNA IZQUIERDA
+    cx_izq = 165
+    num_filas = len(filas_specs)
+
+    if num_filas >= 3:
         y_cursor = 140
-        gap_specs = 115
         gap_fila = 55
-    else:
-        # Si no hay terreno, expande el espacio entre bloques para equilibrar la columna
-        y_cursor = 165
-        gap_specs = 150
+        gap_sep = 115
+    elif num_filas == 2:
+        y_cursor = 160
         gap_fila = 70
+        gap_sep = 145
+    elif num_filas == 1:
+        y_cursor = 190
+        gap_fila = 85
+        gap_sep = 165
+    else:
+        y_cursor = 240
+        gap_fila = 0
+        gap_sep = 0
 
     draw.text((cx_izq, y_cursor - 60), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
     draw.text((cx_izq, y_cursor - 10), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
-    draw.text((cx_izq, y_cursor + 50), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
+
+    # PRECIO: SIN CENTAVOS Y CON AUTO-AJUSTE DE ANCHO
+    precio_raw = str(datos.get("precio", "$0")).strip()
+    precio_limpio = re.sub(r'\.00$', '', precio_raw)
+
+    size_precio = 52
+    font_precio = cargar_fuente(size_precio, bold=True)
+    max_ancho_precio = 270
+
+    while size_precio > 24:
+        bbox = draw.textbbox((0, 0), precio_limpio, font=font_precio)
+        ancho_texto = bbox[2] - bbox[0]
+        if ancho_texto <= max_ancho_precio:
+            break
+        size_precio -= 2
+        font_precio = cargar_fuente(size_precio, bold=True)
+
+    draw.text((cx_izq, y_cursor + 50), precio_limpio, fill=GRIS_OSCURO, font=font_precio, anchor="mm")
     draw.text((cx_izq, y_cursor + 90), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
 
-    y_linea = y_cursor + 120
-    draw.line([(30, y_linea), (300, y_linea)], fill=GRIS_LINEA, width=2)
+    y_linea_base = y_cursor + 120
+    draw.line([(30, y_linea_base), (300, y_linea_base)], fill=GRIS_LINEA, width=2)
 
-    # Fila 1: Recámaras y Estacionamiento
-    y_r1 = y_linea + gap_fila
-    rec_val = str(datos.get("recamaras", "-")) or "-"
-    draw.text((cx_izq - 65, y_r1), rec_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq - 65, y_r1 + 28), "RECAMARAS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "recamaras", cx_izq - 65, y_r1 + 70, max_size=52)
+    # 4. ESPECIFICACIONES CON ICONOS MODERNOS
+    y_actual = y_linea_base
+    for fila in filas_specs:
+        y_fila_texto = y_actual + gap_fila
+        if len(fila) == 2:
+            item_a, item_b = fila[0], fila[1]
+            draw.text((cx_izq - 65, y_fila_texto), item_a["valor"], fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+            draw.text((cx_izq - 65, y_fila_texto + 28), item_a["label"], fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+            pegar_icono(lienzo, item_a["clave"], cx_izq - 65, y_fila_texto + 70, max_size=52)
 
-    est_val = str(datos.get("estacionamiento", "-")) or "-"
-    draw.text((cx_izq + 65, y_r1), est_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq + 65, y_r1 + 28), "ESTAC.", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "estac", cx_izq + 65, y_r1 + 70, max_size=52)
+            draw.text((cx_izq + 65, y_fila_texto), item_b["valor"], fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+            draw.text((cx_izq + 65, y_fila_texto + 28), item_b["label"], fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+            pegar_icono(lienzo, item_b["clave"], cx_izq + 65, y_fila_texto + 70, max_size=52)
+        else:
+            item_u = fila[0]
+            draw.text((cx_izq, y_fila_texto), item_u["valor"], fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+            draw.text((cx_izq, y_fila_texto + 28), item_u["label"], fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+            pegar_icono(lienzo, item_u["clave"], cx_izq, y_fila_texto + 70, max_size=52)
 
-    y_sep1 = y_r1 + gap_specs
-    draw.line([(30, y_sep1), (300, y_sep1)], fill=GRIS_LINEA, width=2)
+        y_actual = y_fila_texto + gap_sep
+        draw.line([(30, y_actual), (300, y_actual)], fill=GRIS_LINEA, width=2)
 
-    # Fila 2: Baños y Pisos
-    y_r2 = y_sep1 + gap_fila
-    ban_val = str(datos.get("banos", "-")) or "-"
-    draw.text((cx_izq - 65, y_r2), ban_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq - 65, y_r2 + 28), "BAÑOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "banos", cx_izq - 65, y_r2 + 70, max_size=52)
-
-    pis_val = str(datos.get("pisos", "1")) or "1"
-    draw.text((cx_izq + 65, y_r2), pis_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq + 65, y_r2 + 28), "PISOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "pisos", cx_izq + 65, y_r2 + 70, max_size=52)
-
-    y_sep2 = y_r2 + gap_specs
-    draw.line([(30, y_sep2), (300, y_sep2)], fill=GRIS_LINEA, width=2)
-
-    # Fila 3: Terreno (SOLO SI TIENE INFORMACIÓN)
-    if tiene_terreno:
-        y_r3 = y_sep2 + gap_fila
-        draw.text((cx_izq, y_r3), terreno_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-        draw.text((cx_izq, y_r3 + 28), "TERRENO m2", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-        pegar_icono(lienzo, "terreno", cx_izq, y_r3 + 70, max_size=52)
-        draw.line([(30, y_r3 + gap_specs), (300, y_r3 + gap_specs)], fill=GRIS_LINEA, width=2)
-
-    # 3. 4 FOTOS EN ALTA RESOLUCIÓN (INICIO EN Y=118 PARA MÁS AIRE SUPERIOR)
+    # 5. 4 FOTOS EN ALTA RESOLUCIÓN
     x_col1 = 330
     x_col2 = 765
     y_fila1 = 118
@@ -321,7 +367,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 4. TARJETA INFERIOR DEL ASESOR
+    # 6. TARJETA INFERIOR DEL ASESOR
     foto_ruta = asesor_datos.get("foto", "")
     if foto_ruta and os.path.exists(foto_ruta):
         try:
@@ -334,14 +380,14 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
         except Exception:
             pass
 
-    # 5. CONTACTO CENTRAL INFERIOR
+    # 7. CONTACTO CENTRAL INFERIOR
     cx_contacto = 560
     draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
     draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
     draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
     draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
 
-    # 6. LOGO NEXT EN ESQUINA INFERIOR DERECHA
+    # 8. LOGO NEXT EN ESQUINA INFERIOR DERECHA
     if os.path.exists(LOGO_PATH):
         try:
             logo = PILImage.open(LOGO_PATH).convert("RGBA")
@@ -431,7 +477,8 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
             img_resultado = generar_flyer_cuadrado(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
             st.image(img_resultado, caption="Vista Previa en Alta Definición", use_container_width=True)
 
-            nombre_base = datos.get("nombre_archivo", f"{datos.get('tipo_inmueble', 'Inmueble')} en {datos.get('colonia', 'Propiedad')} {datos.get('precio', '')}")
+            precio_nombre = re.sub(r'\.00$', '', str(datos.get('precio', ''))).strip()
+            nombre_base = f"{datos.get('tipo_inmueble', 'Inmueble')} en {datos.get('colonia', 'Propiedad')} {precio_nombre}"
             nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", nombre_base).strip()
             nombre_archivo = f"{nombre_limpio}.jpg"
 
