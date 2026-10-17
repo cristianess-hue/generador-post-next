@@ -118,13 +118,13 @@ def extraer_datos_inmueble(url):
     return og_title, og_desc, body_text, imagenes
 
 # ==========================================
-# ESTRUCTURACIÓN CON IA (DATOS + SECCIONES)
+# ESTRUCTURACIÓN CON IA
 # ==========================================
 
 def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel):
     client = genai.Client(api_key=API_KEY)
     prompt = f"""
-    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y organízalos por secciones claras y legibles:
+    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y organízalos por secciones:
     URL: {url}
     Título: {og_title}
     Descripción: {og_desc}
@@ -144,25 +144,16 @@ def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel
     10. 'construccion': Número de m² de construcción si se menciona (ej: "128"). Si NO tiene, pon "".
     11. 'terreno': Número de m² de terreno si se menciona (ej: "128"). Si NO tiene, pon "".
     12. 'copy_publicitario': Texto estructurado para WhatsApp con emojis respetando la información sin inventar detalles.
-    13. 'texto_ficha_grafica': Resumen idéntico pero organizado estrictamente por títulos en mayúsculas y viñetas (•) para estampar en la segunda imagen.
-        Debe seguir exactamente esta estructura:
-        DISTRIBUCIÓN Y ESPACIOS
-        • Niveles: 2 plantas
-        • Recámaras: 3 (1 en planta baja con baño completo)
-        • Baños: 3 completos y 1 medio baño
-        • Estacionamiento: Cochera para 2 autos
-        
-        EQUIPAMIENTO
-        • Sistema de ósmosis para agua purificada
-        • Boiler e instalación de gas
-        • Bomba / Hidroneumático de presión de agua
-        • Reja de protección en patio
-        
-        SERVICIOS INCLUIDOS (si aplica)
-        • Internet de alta velocidad y agua potable
-        
-        ÁREA COMÚN / PRIVADA (si aplica)
-        • Acceso controlado y parque con juegos infantiles
+    13. 'texto_ficha_grafica': Resumen idéntico organizado por títulos en mayúsculas y viñetas (•) para la imagen.
+        REGLA CRÍTICA DE REDACCIÓN:
+        - NUNCA pongas las palabras "(si aplica)", "(si existe)", ni paréntesis explicativos en los títulos.
+        - Los títulos válidos son solo:
+          DISTRIBUCIÓN Y ESPACIOS
+          EQUIPAMIENTO
+          SERVICIOS INCLUIDOS
+          ÁREA COMÚN / PRIVADA
+          ESTATUS LEGAL
+        - Si un inmueble no incluye servicios o no tiene áreas comunes, simplemente OMITE ese bloque por completo.
 
     Devuelve un JSON estrictamente válido:
     {{
@@ -189,7 +180,15 @@ def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel
                 contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json")
             )
-            return json.loads(res.text)
+            data = json.loads(res.text)
+            
+            # Limpieza forzada de "(si aplica)" tanto en el texto gráfico como en el copy
+            if "texto_ficha_grafica" in data:
+                data["texto_ficha_grafica"] = re.sub(r'\s*\((?:si\s+aplica|si\s+existe)\)', '', data["texto_ficha_grafica"], flags=re.IGNORECASE)
+            if "copy_publicitario" in data:
+                data["copy_publicitario"] = re.sub(r'\s*\((?:si\s+aplica|si\s+existe)\)', '', data["copy_publicitario"], flags=re.IGNORECASE)
+
+            return data
         except Exception:
             time.sleep(1)
             continue
@@ -239,7 +238,7 @@ def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=52):
             pass
 
 # ==========================================
-# BASE COMÚN GRÁFICA (COLUMNA IZQ Y PIE)
+# BASE COMÚN GRÁFICA
 # ==========================================
 
 def renderizar_base_flyer(datos, asesor_nombre, asesor_datos):
@@ -264,7 +263,7 @@ def renderizar_base_flyer(datos, asesor_nombre, asesor_datos):
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. TÍTULO CENTRADO SOBRE LA ZONA DERECHA
+    # 1. TÍTULO CENTRADO
     cx_zona_der = 750
     colonia = str(datos.get("colonia", "PROPIEDAD")).upper().strip()
     draw.text((cx_zona_der, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
@@ -397,7 +396,7 @@ def renderizar_base_flyer(datos, asesor_nombre, asesor_datos):
     return lienzo
 
 # ==========================================
-# GENERADOR 1: FLYER DE PORTADA (CON 4 FOTOS)
+# GENERADOR 1: FLYER DE PORTADA
 # ==========================================
 
 def generar_flyer_portada(datos, urls_4_fotos, asesor_nombre, asesor_datos):
@@ -449,7 +448,6 @@ def generar_flyer_ficha(datos, asesor_nombre, asesor_datos):
     font_header_ficha = cargar_fuente(25, bold=True)
     draw.text((x_ini + 25, y_ini + 29), "FICHA TÉCNICA Y DETALLES DEL INMUEBLE", fill=(30, 41, 59), font=font_header_ficha, anchor="lm")
 
-    # Fuentes y estilos
     font_seccion = cargar_fuente(23, bold=True)
     font_cuerpo = cargar_fuente(21, bold=False)
 
@@ -460,18 +458,22 @@ def generar_flyer_ficha(datos, asesor_nombre, asesor_datos):
     max_w_texto = ancho_panel - 70
 
     for linea in lineas_raw:
-        # Detectar si es un título de sección
+        # Limpieza de seguridad por si escapa un paréntesis de condición
+        linea = re.sub(r'\s*\((?:si\s+aplica|si\s+existe)\)', '', linea, flags=re.IGNORECASE).strip()
+        if not linea:
+            continue
+
         es_subtitulo = not linea.startswith("•") and not linea.startswith("-") and (linea.isupper() or any(s in linea.lower() for s in ["distribución", "equipamiento", "servicios", "área común", "estatus", "amenidades"]))
 
         if es_subtitulo:
-            y_pos += 12  # Espacio visual antes de una nueva sección
+            y_pos += 12
             fuente_actual = font_seccion
             color_actual = (227, 6, 19)
             x_offset = x_ini + 30
         else:
             fuente_actual = font_cuerpo
             color_actual = (51, 65, 85)
-            x_offset = x_ini + 42  # Sangría para viñetas
+            x_offset = x_ini + 42
 
         palabras = linea.split(" ")
         linea_parcial = ""
