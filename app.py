@@ -118,13 +118,13 @@ def extraer_datos_inmueble(url):
     return og_title, og_desc, body_text, imagenes
 
 # ==========================================
-# ESTRUCTURACIÓN CON IA (DATOS + COPIES)
+# ESTRUCTURACIÓN CON IA (DATOS + SECCIONES)
 # ==========================================
 
 def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel):
     client = genai.Client(api_key=API_KEY)
     prompt = f"""
-    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y redacta dos versiones de la descripción:
+    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y organízalos por secciones claras y legibles:
     URL: {url}
     Título: {og_title}
     Descripción: {og_desc}
@@ -132,54 +132,51 @@ def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel
     Asesor: {asesor_nombre} | Teléfono: {asesor_tel}
 
     Instrucciones estrictas:
-    1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "Santa Fe", "Praga Residencial", "Montecarlo").
+    1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "Jardín Real", "Santa Fe", "Montecarlo").
     2. 'tipo_inmueble': "Casa", "Departamento", "Oficina", "Local Comercial", "Bodega" o "Terreno".
     3. 'operacion': "Renta" o "Venta".
-    4. 'precio': El precio con formato SIN CENTAVOS (ej: "$10,000", "$3,100,000"). NUNCA pongas .00.
+    4. 'precio': El precio con formato SIN CENTAVOS (ej: "$14,000", "$3,100,000"). NUNCA pongas .00.
     5. 'moneda': "MXN" o "USD".
-    6. 'recamaras': Número (ej: "2" o "3"). Si NO tiene o no se menciona, pon "".
-    7. 'estacionamiento': Número de autos (ej: "1", "2", "3"). Si NO tiene o no se menciona, pon "".
-    8. 'banos': Número (ej: "1", "2" o "2.5"). Si NO tiene o no se menciona, pon "".
-    9. 'pisos': Número de niveles o pisos (ej: "1", "2"). Si NO tiene o no se menciona, pon "".
-    10. 'construccion': Número de m² de construcción si se menciona (ej: "192", "71"). Si NO tiene, pon "".
-    11. 'terreno': Número de m² de terreno si se menciona (ej: "148", "250"). Si NO tiene, pon "".
-    12. 'copy_publicitario': Redacta el texto para WhatsApp con emojis respetando estrictamente la información sin inventar detalles:
-        🏡 *[TIPO] EN [OPERACIÓN] | [COLONIA]*
-        💰 *Precio:* [PRECIO] [MONEDA]
+    6. 'recamaras': Número (ej: "3"). Si NO tiene, pon "".
+    7. 'estacionamiento': Número de autos (ej: "2"). Si NO tiene, pon "".
+    8. 'banos': Número (ej: "3" o "3.5"). Si NO tiene, pon "".
+    9. 'pisos': Número de niveles o pisos (ej: "2"). Si NO tiene, pon "".
+    10. 'construccion': Número de m² de construcción si se menciona (ej: "128"). Si NO tiene, pon "".
+    11. 'terreno': Número de m² de terreno si se menciona (ej: "128"). Si NO tiene, pon "".
+    12. 'copy_publicitario': Texto estructurado para WhatsApp con emojis respetando la información sin inventar detalles.
+    13. 'texto_ficha_grafica': Resumen idéntico pero organizado estrictamente por títulos en mayúsculas y viñetas (•) para estampar en la segunda imagen.
+        Debe seguir exactamente esta estructura:
+        DISTRIBUCIÓN Y ESPACIOS
+        • Niveles: 2 plantas
+        • Recámaras: 3 (1 en planta baja con baño completo)
+        • Baños: 3 completos y 1 medio baño
+        • Estacionamiento: Cochera para 2 autos
         
-        📐 *Superficie:*
-        (Terreno y construcción si existen)
+        EQUIPAMIENTO
+        • Sistema de ósmosis para agua purificada
+        • Boiler e instalación de gas
+        • Bomba / Hidroneumático de presión de agua
+        • Reja de protección en patio
         
-        ✨ *Distribución:*
-        (Viñetas con • sobre niveles, recámaras, baños, estac.)
+        SERVICIOS INCLUIDOS (si aplica)
+        • Internet de alta velocidad y agua potable
         
-        ⚡ *Equipamiento:*
-        (Detalla todo el equipamiento del texto)
-        
-        🌳 *Área Común / Privada:*
-        (Si tiene amenidades)
-        
-        🛡️ *Estatus Legal:*
-        (Si menciona estatus)
-        
-        📲 *Más información y citas:*
-        *{asesor_nombre}* - Next Bienes Raíces
-        WhatsApp: https://wa.me/52{asesor_tel}
-    13. 'texto_ficha_grafica': El mismo resumen técnico pero SIN emojis ni enlaces web, organizado en párrafos concisos para estampar en la segunda imagen (Ficha Técnica).
+        ÁREA COMÚN / PRIVADA (si aplica)
+        • Acceso controlado y parque con juegos infantiles
 
     Devuelve un JSON estrictamente válido:
     {{
-      "colonia": "Santa Fe",
-      "tipo_inmueble": "Oficina",
-      "operacion": "Venta",
-      "precio": "$3,100,000",
+      "colonia": "Jardín Real",
+      "tipo_inmueble": "Casa",
+      "operacion": "Renta",
+      "precio": "$14,000",
       "moneda": "MXN",
-      "recamaras": "",
-      "estacionamiento": "3",
-      "banos": "",
-      "pisos": "",
-      "construccion": "71",
-      "terreno": "",
+      "recamaras": "3",
+      "estacionamiento": "2",
+      "banos": "3.5",
+      "pisos": "2",
+      "construccion": "128",
+      "terreno": "128",
       "copy_publicitario": "...",
       "texto_ficha_grafica": "..."
     }}
@@ -431,47 +428,51 @@ def generar_flyer_portada(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     return buf.getvalue()
 
 # ==========================================
-# GENERADOR 2: FICHA TÉCNICA (CON TEXTO ESTRUCTURADO)
+# GENERADOR 2: FICHA TÉCNICA ESTRUCTURADA
 # ==========================================
 
 def generar_flyer_ficha(datos, asesor_nombre, asesor_datos):
     lienzo = renderizar_base_flyer(datos, asesor_nombre, asesor_datos)
     draw = ImageDraw.Draw(lienzo)
 
-    # Panel contenedor de texto donde iban las fotos
     x_ini, y_ini = 330, 118
     x_fin, y_fin = 1170, 873
     ancho_panel = x_fin - x_ini
 
-    # Fondo suave para la ficha técnica
     draw.rounded_rectangle([(x_ini, y_ini), (x_fin, y_fin)], radius=16, fill=(248, 250, 252), outline=(226, 232, 240), width=2)
     
     # Encabezado del contenedor
-    draw.rounded_rectangle([(x_ini, y_ini), (x_fin, y_ini + 60)], radius=16, fill=(241, 245, 249))
-    draw.rectangle([(x_ini, y_ini + 35), (x_fin, y_ini + 60)], fill=(241, 245, 249)) # Cuadrar esquinas inferiores
-    draw.line([(x_ini, y_ini + 60), (x_fin, y_ini + 60)], fill=(226, 232, 240), width=2)
+    draw.rounded_rectangle([(x_ini, y_ini), (x_fin, y_ini + 58)], radius=16, fill=(241, 245, 249))
+    draw.rectangle([(x_ini, y_ini + 30), (x_fin, y_ini + 58)], fill=(241, 245, 249))
+    draw.line([(x_ini, y_ini + 58), (x_fin, y_ini + 58)], fill=(226, 232, 240), width=2)
 
-    font_header_ficha = cargar_fuente(26, bold=True)
-    draw.text((x_ini + 25, y_ini + 30), "FICHA TÉCNICA Y DETALLES DEL INMUEBLE", fill=(30, 41, 59), font=font_header_ficha, anchor="lm")
+    font_header_ficha = cargar_fuente(25, bold=True)
+    draw.text((x_ini + 25, y_ini + 29), "FICHA TÉCNICA Y DETALLES DEL INMUEBLE", fill=(30, 41, 59), font=font_header_ficha, anchor="lm")
 
-    # Renderizado y ajuste de texto
-    font_seccion = cargar_fuente(22, bold=True)
-    font_cuerpo = cargar_fuente(20, bold=False)
+    # Fuentes y estilos
+    font_seccion = cargar_fuente(23, bold=True)
+    font_cuerpo = cargar_fuente(21, bold=False)
 
     texto_ficha = datos.get("texto_ficha_grafica", "")
     lineas_raw = [l.strip() for l in texto_ficha.split("\n") if l.strip()]
 
     y_pos = y_ini + 85
-    max_w_texto = ancho_panel - 60
+    max_w_texto = ancho_panel - 70
 
     for linea in lineas_raw:
-        # Detectar si es un subtítulo
-        es_subtitulo = any(linea.lower().startswith(s) for s in ["superficie", "distribución", "equipamiento", "área común", "estatus", "detalles", "amenidades"]) or linea.isupper()
-        
-        fuente_actual = font_seccion if es_subtitulo else font_cuerpo
-        color_actual = (227, 6, 19) if es_subtitulo else (51, 65, 85)
+        # Detectar si es un título de sección
+        es_subtitulo = not linea.startswith("•") and not linea.startswith("-") and (linea.isupper() or any(s in linea.lower() for s in ["distribución", "equipamiento", "servicios", "área común", "estatus", "amenidades"]))
 
-        # Ajuste de línea automático (Word wrap)
+        if es_subtitulo:
+            y_pos += 12  # Espacio visual antes de una nueva sección
+            fuente_actual = font_seccion
+            color_actual = (227, 6, 19)
+            x_offset = x_ini + 30
+        else:
+            fuente_actual = font_cuerpo
+            color_actual = (51, 65, 85)
+            x_offset = x_ini + 42  # Sangría para viñetas
+
         palabras = linea.split(" ")
         linea_parcial = ""
 
@@ -481,14 +482,14 @@ def generar_flyer_ficha(datos, asesor_nombre, asesor_datos):
             if (bbox[2] - bbox[0]) <= max_w_texto:
                 linea_parcial = prueba
             else:
-                if y_pos < y_fin - 35:
-                    draw.text((x_ini + 30, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
-                    y_pos += 30 if not es_subtitulo else 34
+                if y_pos < y_fin - 30:
+                    draw.text((x_offset, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
+                    y_pos += 30
                 linea_parcial = pal
 
-        if linea_parcial and y_pos < y_fin - 35:
-            draw.text((x_ini + 30, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
-            y_pos += 36 if es_subtitulo else 30
+        if linea_parcial and y_pos < y_fin - 30:
+            draw.text((x_offset, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
+            y_pos += 34 if es_subtitulo else 30
 
     buf = io.BytesIO()
     lienzo.save(buf, format="JPEG", quality=100, subsampling=0)
@@ -592,7 +593,6 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
         with st.spinner("Componiendo ambas imágenes en ultra alta resolución..."):
             datos = st.session_state.datos_extraidos
             
-            # Generar Portada y Ficha
             img_p = generar_flyer_portada(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
             img_f = generar_flyer_ficha(datos, asesor_seleccionado, info_asesor)
             
