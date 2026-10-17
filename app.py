@@ -217,7 +217,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     lienzo = PILImage.new("RGB", (ancho, alto), (255, 255, 255))
     draw = ImageDraw.Draw(lienzo)
 
-    # Tipografías proporcionadas y legibles
     font_colonia = cargar_fuente(50, bold=True)
     font_tipo = cargar_fuente(34, bold=True)
     font_operacion = cargar_fuente(42, bold=True)
@@ -227,7 +226,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     font_datos_num = cargar_fuente(38, bold=True)
     font_datos_lbl = cargar_fuente(18, bold=True)
     
-    # Bloque inferior del asesor (grande y comercial)
     font_pie_nombre = cargar_fuente(42, bold=True)
     font_pie_tel = cargar_fuente(40, bold=True)
     font_pie_cargo = cargar_fuente(22, bold=False)
@@ -237,24 +235,36 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS (X: 330 a 1170 -> Centro exacto: 750)
+    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS (CON ESPACIO AIREADO)
     cx_fotos = 750
     colonia = datos.get("colonia", "PROPIEDAD").upper().strip()
-    draw.text((cx_fotos, 60), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
+    draw.text((cx_fotos, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
 
-    # 2. COLUMNA IZQUIERDA (TIPO, OPERACIÓN Y PRECIO)
+    # 2. COLUMNA IZQUIERDA (DISTRIBUCIÓN VERTICAL ADAPTATIVA)
     cx_izq = 165
-    draw.text((cx_izq, 85), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
-    draw.text((cx_izq, 135), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
-    draw.text((cx_izq, 195), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
-    draw.text((cx_izq, 235), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
+    terreno_val = str(datos.get("terreno", "")).strip()
+    tiene_terreno = bool(terreno_val and terreno_val not in ["0", "-", ""])
 
-    y_linea = 265
+    if tiene_terreno:
+        y_cursor = 140
+        gap_specs = 115
+        gap_fila = 55
+    else:
+        # Si no hay terreno, expande el espacio entre bloques para equilibrar la columna
+        y_cursor = 165
+        gap_specs = 150
+        gap_fila = 70
+
+    draw.text((cx_izq, y_cursor - 60), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
+    draw.text((cx_izq, y_cursor - 10), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
+    draw.text((cx_izq, y_cursor + 50), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
+    draw.text((cx_izq, y_cursor + 90), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
+
+    y_linea = y_cursor + 120
     draw.line([(30, y_linea), (300, y_linea)], fill=GRIS_LINEA, width=2)
 
-    # 3. ESPECIFICACIONES CON ICONOS
     # Fila 1: Recámaras y Estacionamiento
-    y_r1 = y_linea + 55
+    y_r1 = y_linea + gap_fila
     rec_val = str(datos.get("recamaras", "-")) or "-"
     draw.text((cx_izq - 65, y_r1), rec_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
     draw.text((cx_izq - 65, y_r1 + 28), "RECAMARAS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
@@ -265,11 +275,11 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     draw.text((cx_izq + 65, y_r1 + 28), "ESTAC.", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
     pegar_icono(lienzo, "estac", cx_izq + 65, y_r1 + 70, max_size=52)
 
-    y_sep1 = y_r1 + 115
+    y_sep1 = y_r1 + gap_specs
     draw.line([(30, y_sep1), (300, y_sep1)], fill=GRIS_LINEA, width=2)
 
     # Fila 2: Baños y Pisos
-    y_r2 = y_sep1 + 55
+    y_r2 = y_sep1 + gap_fila
     ban_val = str(datos.get("banos", "-")) or "-"
     draw.text((cx_izq - 65, y_r2), ban_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
     draw.text((cx_izq - 65, y_r2 + 28), "BAÑOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
@@ -280,23 +290,22 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     draw.text((cx_izq + 65, y_r2 + 28), "PISOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
     pegar_icono(lienzo, "pisos", cx_izq + 65, y_r2 + 70, max_size=52)
 
-    y_sep2 = y_r2 + 115
+    y_sep2 = y_r2 + gap_specs
     draw.line([(30, y_sep2), (300, y_sep2)], fill=GRIS_LINEA, width=2)
 
     # Fila 3: Terreno (SOLO SI TIENE INFORMACIÓN)
-    terreno_val = str(datos.get("terreno", "")).strip()
-    if terreno_val and terreno_val not in ["0", "-", ""]:
-        y_r3 = y_sep2 + 55
+    if tiene_terreno:
+        y_r3 = y_sep2 + gap_fila
         draw.text((cx_izq, y_r3), terreno_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
         draw.text((cx_izq, y_r3 + 28), "TERRENO m2", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
         pegar_icono(lienzo, "terreno", cx_izq, y_r3 + 70, max_size=52)
-        draw.line([(30, y_r3 + 115), (300, y_r3 + 115)], fill=GRIS_LINEA, width=2)
+        draw.line([(30, y_r3 + gap_specs), (300, y_r3 + gap_specs)], fill=GRIS_LINEA, width=2)
 
-    # 4. 4 FOTOS EN ALTA RESOLUCIÓN
+    # 3. 4 FOTOS EN ALTA RESOLUCIÓN (INICIO EN Y=118 PARA MÁS AIRE SUPERIOR)
     x_col1 = 330
     x_col2 = 765
-    y_fila1 = 110
-    y_fila2 = 505
+    y_fila1 = 118
+    y_fila2 = 508
     foto_w, foto_h = 405, 365
 
     posiciones = [
@@ -312,12 +321,11 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 5. TARJETA INFERIOR DEL ASESOR (AMPLIADA)
+    # 4. TARJETA INFERIOR DEL ASESOR
     foto_ruta = asesor_datos.get("foto", "")
     if foto_ruta and os.path.exists(foto_ruta):
         try:
             foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
-            # Dimensiones mayores para llenar el espacio
             foto_asesor.thumbnail((210, 240), PILImage.Resampling.LANCZOS)
             draw.rounded_rectangle([(30, 910), (245, 1165)], radius=16, outline=(254, 205, 211), width=4)
             px = int(30 + (215 - foto_asesor.width) / 2)
@@ -326,14 +334,14 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
         except Exception:
             pass
 
-    # 6. CONTACTO CENTRAL INFERIOR
+    # 5. CONTACTO CENTRAL INFERIOR
     cx_contacto = 560
     draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
     draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
     draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
     draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
 
-    # 7. LOGO NEXT EN ESQUINA INFERIOR DERECHA (AMPLIADO)
+    # 6. LOGO NEXT EN ESQUINA INFERIOR DERECHA
     if os.path.exists(LOGO_PATH):
         try:
             logo = PILImage.open(LOGO_PATH).convert("RGBA")
