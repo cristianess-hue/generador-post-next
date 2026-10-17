@@ -118,17 +118,18 @@ def extraer_datos_inmueble(url):
     return og_title, og_desc, body_text, imagenes
 
 # ==========================================
-# ESTRUCTURACIÓN CON IA
+# ESTRUCTURACIÓN CON IA (DATOS + TEXTO COMERCIAL)
 # ==========================================
 
-def procesar_con_ia(url, og_title, og_desc, body_text):
+def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel):
     client = genai.Client(api_key=API_KEY)
     prompt = f"""
-    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble:
+    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y redacta un copy comercial limpio para WhatsApp:
     URL: {url}
     Título: {og_title}
     Descripción: {og_desc}
     Texto: {body_text[:6000]}
+    Asesor: {asesor_nombre} | Teléfono: {asesor_tel}
 
     Instrucciones estrictas:
     1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "Santa Fe", "Praga Residencial", "Montecarlo").
@@ -142,6 +143,29 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
     9. 'pisos': Número de niveles o pisos (ej: "1", "2"). Si NO tiene o no se menciona, pon "".
     10. 'construccion': Número de m² de construcción si se menciona (ej: "192", "71"). Si NO tiene, pon "".
     11. 'terreno': Número de m² de terreno si se menciona (ej: "148", "250"). Si NO tiene, pon "".
+    12. 'copy_publicitario': Redacta el texto estructurado para WhatsApp con emojis, respetando al 100% la información original sin inventar detalles.
+        Debe seguir esta estructura:
+        🏡 *[TIPO] EN [OPERACIÓN] | [COLONIA]*
+        💰 *Precio:* [PRECIO] [MONEDA]
+        
+        📐 *Superficie y Medidas:*
+        (Menciona terreno y construcción si existen)
+        
+        ✨ *Distribución y Espacios:*
+        (Puntos limpios con viñetas • sobre plantas, recámaras, baños, estac.)
+        
+        ⚡ *Equipamiento:*
+        (Detalla todo el equipamiento que venga en el texto)
+        
+        🌳 *Área Común / Privada:*
+        (Si tiene amenidades, canchas, alberca, acceso controlado)
+        
+        🛡️ *Estatus Legal:*
+        (Si menciona libre de gravamen o gravamen)
+        
+        📲 *Más información y citas:*
+        *{asesor_nombre}* - Next Bienes Raíces
+        WhatsApp: https://wa.me/52{asesor_tel}
 
     Devuelve un JSON estrictamente válido:
     {{
@@ -155,7 +179,8 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
       "banos": "",
       "pisos": "",
       "construccion": "71",
-      "terreno": ""
+      "terreno": "",
+      "copy_publicitario": "..."
     }}
     """
     modelos = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']
@@ -341,7 +366,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             draw.text((cx_izq, y_fila_texto + 28), item_u["label"], fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
             pegar_icono(lienzo, item_u["clave"], cx_izq, y_fila_texto + 70, max_size=52)
 
-        # Cierre inferior de la fila
         y_actual = y_fila_texto + gap_sep
         draw.line([(30, y_actual), (300, y_actual)], fill=GRIS_LINEA, width=2)
 
@@ -400,16 +424,26 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     return buf.getvalue()
 
 # ==========================================
-# INTERFAZ STREAMLIT
+# INICIALIZACIÓN DE ESTADO (PERSISTENCIA TOTAL)
 # ==========================================
-
-st.title("🖼️ Generador de Post Cuadrado para Redes (1200x1200)")
-st.write("Pega el enlace de la propiedad para extraer los datos automáticamente y seleccionar las fotos:")
 
 if "datos_extraidos" not in st.session_state:
     st.session_state.datos_extraidos = None
 if "fotos_extraidas" not in st.session_state:
     st.session_state.fotos_extraidas = []
+if "img_generada" not in st.session_state:
+    st.session_state.img_generada = None
+if "nombre_descarga" not in st.session_state:
+    st.session_state.nombre_descarga = ""
+if "copy_publicitario" not in st.session_state:
+    st.session_state.copy_publicitario = ""
+
+# ==========================================
+# INTERFAZ STREAMLIT
+# ==========================================
+
+st.title("🖼️ Generador de Post Cuadrado para Redes (1200x1200)")
+st.write("Pega el enlace de la propiedad para extraer los datos automáticamente, seleccionar las fotos y obtener el copy publicitario:")
 
 col_url, col_as = st.columns([2, 1])
 with col_url:
@@ -426,18 +460,24 @@ if st.button("🔍 Extraer Propiedad y Fotos", type="primary"):
     elif not API_KEY:
         st.error("Falta configurar GEMINI_API_KEY en Secrets.")
     else:
-        with st.spinner("Analizando portal y extrayendo fotos..."):
+        with st.spinner("Analizando portal, extrayendo fotos y estructurando datos..."):
             try:
                 og_t, og_d, b_txt, fotos = extraer_datos_inmueble(url_input.strip())
-                datos = procesar_con_ia(url_input.strip(), og_t, og_d, b_txt)
+                datos = procesar_con_ia(url_input.strip(), og_t, og_d, b_txt, asesor_seleccionado, info_asesor['telefono'])
+                
                 st.session_state.datos_extraidos = datos
                 st.session_state.fotos_extraidas = fotos
+                st.session_state.copy_publicitario = datos.get("copy_publicitario", "")
+                # Limpiar resultado previo al extraer una nueva propiedad
+                st.session_state.img_generada = None
+                st.session_state.nombre_descarga = ""
+                
                 st.success(f"¡Propiedad analizada con éxito! ({datos.get('tipo_inmueble', '')} en {datos.get('colonia', '')} - {datos.get('precio', '')})")
             except Exception as e:
                 st.error(f"Error al analizar el portal: {e}")
 
 # ==========================================
-# ASIGNACIÓN DE FOTOS Y DESCARGA
+# ASIGNACIÓN DE FOTOS Y GENERACIÓN
 # ==========================================
 if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
     st.markdown("---")
@@ -473,9 +513,7 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
         with st.spinner("Componiendo imagen nítida en alta resolución..."):
             datos = st.session_state.datos_extraidos
             img_resultado = generar_flyer_cuadrado(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
-            st.image(img_resultado, caption="Vista Previa en Alta Definición", use_container_width=True)
-
-            # Nombre de archivo en formato Title (Tipo en Colonia Precio)
+            
             tipo_limpio = str(datos.get('tipo_inmueble', 'Inmueble')).strip().capitalize()
             colonia_limpia = str(datos.get('colonia', 'Propiedad')).strip().title()
             precio_limpio = re.sub(r'\.00$', '', str(datos.get('precio', ''))).strip()
@@ -483,11 +521,31 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
             nombre_base = f"{tipo_limpio} en {colonia_limpia} {precio_limpio}"
             nombre_archivo = f"{re.sub(r'[\\/*?:\"<>|]', '', nombre_base).strip()}.jpg"
 
-            st.download_button(
-                label=f"📥 Descargar {nombre_archivo}",
-                data=img_resultado,
-                file_name=nombre_archivo,
-                mime="image/jpeg",
-                type="primary",
-                use_container_width=True
-            )
+            # Guardar en session_state para evitar borrado tras descargar
+            st.session_state.img_generada = img_resultado
+            st.session_state.nombre_descarga = nombre_archivo
+
+# ==========================================
+# RESULTADO PERSISTENTE: IMAGEN + TEXTO LISTO PARA COPIAR
+# ==========================================
+if st.session_state.img_generada:
+    st.markdown("---")
+    st.subheader("🎉 Resultado Final")
+
+    col_img, col_txt = st.columns([1, 1])
+
+    with col_img:
+        st.image(st.session_state.img_generada, caption="Vista Previa (1200x1200 px)", use_container_width=True)
+        st.download_button(
+            label=f"📥 Descargar {st.session_state.nombre_descarga}",
+            data=st.session_state.img_generada,
+            file_name=st.session_state.nombre_descarga,
+            mime="image/jpeg",
+            type="primary",
+            use_container_width=True
+        )
+
+    with col_txt:
+        st.markdown("#### 📋 Ficha Publicitaria para WhatsApp / Redes")
+        st.caption("Haz clic en el icono de **Copiar** en la esquina superior derecha del recuadro:")
+        st.code(st.session_state.copy_publicitario, language="markdown")
