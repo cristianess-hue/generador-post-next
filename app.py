@@ -217,7 +217,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     lienzo = PILImage.new("RGB", (ancho, alto), (255, 255, 255))
     draw = ImageDraw.Draw(lienzo)
 
-    # Tipografías proporcionadas y de alto impacto
+    # Tipografías proporcionadas y legibles
     font_colonia = cargar_fuente(50, bold=True)
     font_tipo = cargar_fuente(34, bold=True)
     font_operacion = cargar_fuente(42, bold=True)
@@ -227,9 +227,9 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     font_datos_num = cargar_fuente(38, bold=True)
     font_datos_lbl = cargar_fuente(18, bold=True)
     
-    # Bloque inferior asesor (más grande y legible)
-    font_pie_nombre = cargar_fuente(40, bold=True)
-    font_pie_tel = cargar_fuente(38, bold=True)
+    # Bloque inferior del asesor (grande y comercial)
+    font_pie_nombre = cargar_fuente(42, bold=True)
+    font_pie_tel = cargar_fuente(40, bold=True)
     font_pie_cargo = cargar_fuente(22, bold=False)
     font_pie_lema = cargar_fuente(20, bold=False)
 
@@ -237,8 +237,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS
-    # Las fotos van desde X=330 hasta X=1170 (ancho total: 840 px). Centro exacto: X=750
+    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS (X: 330 a 1170 -> Centro exacto: 750)
     cx_fotos = 750
     colonia = datos.get("colonia", "PROPIEDAD").upper().strip()
     draw.text((cx_fotos, 60), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
@@ -313,32 +312,33 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 5. TARJETA INFERIOR DEL ASESOR
+    # 5. TARJETA INFERIOR DEL ASESOR (AMPLIADA)
     foto_ruta = asesor_datos.get("foto", "")
     if foto_ruta and os.path.exists(foto_ruta):
         try:
             foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
-            foto_asesor.thumbnail((185, 205), PILImage.Resampling.LANCZOS)
-            draw.rounded_rectangle([(35, 930), (225, 1150)], radius=14, outline=(254, 205, 211), width=4)
-            px = int(35 + (190 - foto_asesor.width) / 2)
-            py = int(930 + (220 - foto_asesor.height) / 2)
+            # Dimensiones mayores para llenar el espacio
+            foto_asesor.thumbnail((210, 240), PILImage.Resampling.LANCZOS)
+            draw.rounded_rectangle([(30, 910), (245, 1165)], radius=16, outline=(254, 205, 211), width=4)
+            px = int(30 + (215 - foto_asesor.width) / 2)
+            py = int(910 + (255 - foto_asesor.height) / 2)
             lienzo.paste(foto_asesor, (px, py), mask=foto_asesor if "A" in foto_asesor.getbands() else None)
         except Exception:
             pass
 
-    # 6. CONTACTO CENTRAL INFERIOR (AMPLIADO Y LEGIBLE)
-    cx_contacto = 570
+    # 6. CONTACTO CENTRAL INFERIOR
+    cx_contacto = 560
     draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
     draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
     draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
     draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
 
-    # 7. LOGO NEXT EN ESQUINA INFERIOR DERECHA
+    # 7. LOGO NEXT EN ESQUINA INFERIOR DERECHA (AMPLIADO)
     if os.path.exists(LOGO_PATH):
         try:
             logo = PILImage.open(LOGO_PATH).convert("RGBA")
-            logo.thumbnail((260, 120), PILImage.Resampling.LANCZOS)
-            lienzo.paste(logo, (880, 1000), mask=logo if "A" in logo.getbands() else None)
+            logo.thumbnail((320, 150), PILImage.Resampling.LANCZOS)
+            lienzo.paste(logo, (840, 980), mask=logo if "A" in logo.getbands() else None)
         except Exception:
             pass
 
