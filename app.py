@@ -16,7 +16,6 @@ API_KEY = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
 
 LOGO_PATH = "logo_next.png"
 
-# Configuración de asesores con lemas, teléfonos y fotos individuales
 ASESORES = {
     "Cristian Sosa": {
         "telefono": "6622057331",
@@ -30,7 +29,6 @@ ASESORES = {
     }
 }
 
-# Iconos locales
 ICONOS = {
     "recamaras": "ico_cama.png",
     "estac": "ico_auto.png",
@@ -38,6 +36,44 @@ ICONOS = {
     "pisos": "ico_pisos.png",
     "terreno": "ico_terreno.png"
 }
+
+# ==========================================
+# GESTIÓN DE FUENTES NÍTIDAS (DESCARGA AUTOMÁTICA)
+# ==========================================
+
+@st.cache_resource
+def obtener_fuente_bold(size):
+    ruta_font = "Roboto-Bold.ttf"
+    if not os.path.exists(ruta_font):
+        url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Bold.ttf"
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                with open(ruta_font, "wb") as f:
+                    f.write(r.content)
+        except Exception:
+            pass
+    try:
+        return ImageFont.truetype(ruta_font, size)
+    except Exception:
+        return ImageFont.load_default()
+
+@st.cache_resource
+def obtener_fuente_regular(size):
+    ruta_font = "Roboto-Regular.ttf"
+    if not os.path.exists(ruta_font):
+        url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                with open(ruta_font, "wb") as f:
+                    f.write(r.content)
+        except Exception:
+            pass
+    try:
+        return ImageFont.truetype(ruta_font, size)
+    except Exception:
+        return ImageFont.load_default()
 
 # ==========================================
 # EXTRACCIÓN Y SCRAPING
@@ -112,38 +148,38 @@ def extraer_datos_inmueble(url):
 def procesar_con_ia(url, og_title, og_desc, body_text):
     client = genai.Client(api_key=API_KEY)
     prompt = f"""
-    Eres un analista inmobiliario. Extrae los datos exactos para un flyer publicitario:
+    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble:
     URL: {url}
     Título: {og_title}
     Descripción: {og_desc}
     Texto: {body_text[:6000]}
 
     Instrucciones estrictas:
-    1. 'colonia': Nombre del fraccionamiento o colonia (ej: "JARDÍN REAL", "MONTECARLO").
-    2. 'subtitulo': "RESIDENCIAL", "NORTE", "PONIENTE" o vacío según aplique.
-    3. 'tipo_inmueble': "CASAS", "DEPARTAMENTO", "LOCAL COMERCIAL" o "TERRENO".
+    1. 'linea1': Nombre del fraccionamiento/colonia (ejemplo: "JARDÍN REAL", "PRAGA").
+    2. 'linea2': Subtítulo o tipo de desarrollo ("RESIDENCIAL", "NORTE", "CAMPESINO"). SI 'linea1' ya incluye la palabra (ej: 'PRAGA RESIDENCIAL'), déjalo VACÍO "". NUNCA repitas palabras entre linea1 y linea2.
+    3. 'tipo_inmueble': "CASAS", "DEPARTAMENTO", "LOCAL" o "TERRENO".
     4. 'operacion': "Renta" o "Venta".
-    5. 'precio': Solo el monto con formato (ej: "$14,000" o "$3,580,000").
+    5. 'precio': El precio con formato (ejemplo: "$10,000", "$3,580,000").
     6. 'moneda': "MXN" o "USD".
-    7. 'recamaras': Número (ej: "3").
-    8. 'estacionamiento': Número de autos (ej: "2").
-    9. 'banos': Número (ej: "3" o "2.5").
-    10. 'pisos': Número de plantas o niveles (ej: "2" o "1").
-    11. 'terreno': Metros cuadrados de terreno si existen (ej: "128" o "148").
+    7. 'recamaras': Número (ej: "2"). Si no dice nada, déjalo vacío "".
+    8. 'estacionamiento': Número de autos (ej: "1" o "2"). Si no dice nada, déjalo vacío "".
+    9. 'banos': Número (ej: "1" o "2.5"). Si no dice nada, déjalo vacío "".
+    10. 'pisos': Número de plantas o niveles (ej: "1" o "2"). Si no dice nada, pon "1".
+    11. 'terreno': Solo los m² de terreno si están EXPLÍCITAMENTE en el texto (ej: "128"). Si es renta, departamento o no menciona terreno, DEBE SER OBLIGATORIAMENTE cadena vacía "".
 
     Devuelve un JSON estrictamente válido:
     {{
-      "colonia": "JARDÍN REAL",
-      "subtitulo": "RESIDENCIAL",
-      "tipo_inmueble": "CASAS",
+      "linea1": "PRAGA",
+      "linea2": "RESIDENCIAL",
+      "tipo_inmueble": "DEPARTAMENTO",
       "operacion": "Renta",
-      "precio": "$14,000",
+      "precio": "$10,000",
       "moneda": "MXN",
-      "recamaras": "3",
-      "estacionamiento": "2",
-      "banos": "3",
-      "pisos": "2",
-      "terreno": "128"
+      "recamaras": "2",
+      "estacionamiento": "1",
+      "banos": "1",
+      "pisos": "1",
+      "terreno": ""
     }}
     """
     modelos = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']
@@ -166,7 +202,7 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
 
 def descargar_y_recortar(url, target_w, target_h):
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers, timeout=10)
+    r = requests.get(url, headers=headers, timeout=12)
     if r.status_code != 200:
         return None
     img = PILImage.open(io.BytesIO(r.content)).convert("RGB")
@@ -185,7 +221,7 @@ def descargar_y_recortar(url, target_w, target_h):
 
     return img.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
 
-def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=32):
+def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=42):
     ruta = ICONOS.get(clave_icono)
     if ruta and os.path.exists(ruta):
         try:
@@ -198,93 +234,94 @@ def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=32):
             pass
 
 # ==========================================
-# GENERADOR GRÁFICO (PIL 1080x1080)
+# GENERADOR GRÁFICO ULTRA HD (1200x1200 px)
 # ==========================================
 
 def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
-    ancho, alto = 1080, 1080
+    ancho, alto = 1200, 1200
     lienzo = PILImage.new("RGB", (ancho, alto), (255, 255, 255))
     draw = ImageDraw.Draw(lienzo)
 
-    try:
-        font_titulo = ImageFont.truetype("arialbd.ttf", 36)
-        font_sub = ImageFont.truetype("arialbd.ttf", 30)
-        font_precio = ImageFont.truetype("arialbd.ttf", 40)
-        font_operacion = ImageFont.truetype("arialbd.ttf", 34)
-        font_datos_num = ImageFont.truetype("arialbd.ttf", 26)
-        font_datos_lbl = ImageFont.truetype("arialbd.ttf", 15)
-        font_pie_bold = ImageFont.truetype("arialbd.ttf", 28)
-        font_pie_tel = ImageFont.truetype("arialbd.ttf", 28)
-        font_pie_sub = ImageFont.truetype("arial.ttf", 15)
-        font_lema = ImageFont.truetype("ariali.ttf", 14)
-    except Exception:
-        font_titulo = ImageFont.load_default()
-        font_sub = font_titulo
-        font_precio = font_titulo
-        font_operacion = font_titulo
-        font_datos_num = font_datos_lbl = font_titulo
-        font_pie_bold = font_pie_tel = font_pie_sub = font_lema = font_titulo
+    # Fuentes vectoriales de alta definición
+    font_titulo = obtener_fuente_bold(44)
+    font_sub = obtener_fuente_bold(36)
+    font_tipo = obtener_fuente_bold(30)
+    font_operacion = obtener_fuente_bold(38)
+    font_precio = obtener_fuente_bold(46)
+    font_moneda = obtener_fuente_bold(18)
+    
+    font_datos_num = obtener_fuente_bold(32)
+    font_datos_lbl = obtener_fuente_bold(18)
+    
+    font_pie_bold = obtener_fuente_bold(30)
+    font_pie_tel = obtener_fuente_bold(30)
+    font_pie_sub = obtener_fuente_regular(17)
+    font_lema = obtener_fuente_regular(16)
 
     ROJO_NEXT = (227, 6, 19)
-    GRIS_OSCURO = (35, 35, 35)
-    GRIS_LINEA = (220, 220, 220)
+    GRIS_OSCURO = (30, 41, 59)
+    GRIS_LINEA = (226, 232, 240)
 
-    # 1. TEXTOS COLUMNA IZQUIERDA
-    cx_izq = 145
+    # 1. ENCABEZADO Y PRECIO (COLUMNA IZQUIERDA)
+    cx_izq = 165
 
-    colonia = datos.get("colonia", "RESIDENCIAL").upper()
-    subt = datos.get("subtitulo", "").upper()
-    draw.text((cx_izq, 70), colonia, fill=ROJO_NEXT, font=font_titulo, anchor="mm")
-    if subt:
-        draw.text((cx_izq, 108), subt, fill=ROJO_NEXT, font=font_sub, anchor="mm")
+    linea1 = datos.get("linea1", "PROPIEDAD").upper().strip()
+    linea2 = datos.get("linea2", "").upper().strip()
 
-    draw.text((cx_izq, 155), datos.get("tipo_inmueble", "CASAS").upper(), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq, 205), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
+    draw.text((cx_izq, 75), linea1, fill=ROJO_NEXT, font=font_titulo, anchor="mm")
+    y_sig = 120
+    if linea2 and linea2 != linea1:
+        draw.text((cx_izq, y_sig), linea2, fill=ROJO_NEXT, font=font_sub, anchor="mm")
+        y_sig += 45
 
-    draw.text((cx_izq, 265), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
-    draw.text((cx_izq, 302), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+    draw.text((cx_izq, y_sig + 15), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
+    draw.text((cx_izq, y_sig + 70), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
+    draw.text((cx_izq, y_sig + 135), datos.get("precio", "$0"), fill=GRIS_OSCURO, font=font_precio, anchor="mm")
+    draw.text((cx_izq, y_sig + 175), datos.get("moneda", "MXN"), fill=GRIS_OSCURO, font=font_moneda, anchor="mm")
 
-    draw.line([(30, 325), (260, 325)], fill=GRIS_LINEA, width=2)
+    draw.line([(30, y_sig + 205), (300, y_sig + 205)], fill=GRIS_LINEA, width=2)
 
     # 2. ESPECIFICACIONES CON ICONOS
     # Fila 1: Recámaras y Estacionamiento
-    y_r1 = 375
-    draw.text((cx_izq - 60, y_r1), str(datos.get("recamaras", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq - 60, y_r1 + 22), "RECAMARAS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "recamaras", cx_izq - 60, y_r1 + 52)
+    y_r1 = y_sig + 265
+    draw.text((cx_izq - 65, y_r1), str(datos.get("recamaras", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+    draw.text((cx_izq - 65, y_r1 + 25), "RECAMARAS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+    pegar_icono(lienzo, "recamaras", cx_izq - 65, y_r1 + 65, max_size=42)
 
-    draw.text((cx_izq + 60, y_r1), str(datos.get("estacionamiento", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq + 60, y_r1 + 22), "ESTAC.", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "estac", cx_izq + 60, y_r1 + 52)
+    draw.text((cx_izq + 65, y_r1), str(datos.get("estacionamiento", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+    draw.text((cx_izq + 65, y_r1 + 25), "ESTAC.", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+    pegar_icono(lienzo, "estac", cx_izq + 65, y_r1 + 65, max_size=42)
 
-    draw.line([(30, 455), (260, 455)], fill=GRIS_LINEA, width=2)
+    draw.line([(30, y_r1 + 105), (300, y_r1 + 105)], fill=GRIS_LINEA, width=2)
 
     # Fila 2: Baños y Pisos
-    y_r2 = 495
-    draw.text((cx_izq - 60, y_r2), str(datos.get("banos", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq - 60, y_r2 + 22), "BAÑOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "banos", cx_izq - 60, y_r2 + 52)
+    y_r2 = y_r1 + 155
+    draw.text((cx_izq - 65, y_r2), str(datos.get("banos", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+    draw.text((cx_izq - 65, y_r2 + 25), "BAÑOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+    pegar_icono(lienzo, "banos", cx_izq - 65, y_r2 + 65, max_size=42)
 
-    draw.text((cx_izq + 60, y_r2), str(datos.get("pisos", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq + 60, y_r2 + 22), "PISOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "pisos", cx_izq + 60, y_r2 + 52)
+    draw.text((cx_izq + 65, y_r2), str(datos.get("pisos", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+    draw.text((cx_izq + 65, y_r2 + 25), "PISOS", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+    pegar_icono(lienzo, "pisos", cx_izq + 65, y_r2 + 65, max_size=42)
 
-    draw.line([(30, 575), (260, 575)], fill=GRIS_LINEA, width=2)
+    # Fila 3: Terreno (SOLO SI TIENE INFORMACIÓN)
+    terreno_val = str(datos.get("terreno", "")).strip()
+    if terreno_val and terreno_val not in ["0", "-", ""]:
+        draw.line([(30, y_r2 + 105), (300, y_r2 + 105)], fill=GRIS_LINEA, width=2)
+        y_r3 = y_r2 + 155
+        draw.text((cx_izq, y_r3), terreno_val, fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
+        draw.text((cx_izq, y_r3 + 25), "TERRENO m2", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
+        pegar_icono(lienzo, "terreno", cx_izq, y_r3 + 65, max_size=42)
+        draw.line([(30, y_r3 + 105), (300, y_r3 + 105)], fill=GRIS_LINEA, width=2)
+    else:
+        draw.line([(30, y_r2 + 105), (300, y_r2 + 105)], fill=GRIS_LINEA, width=2)
 
-    # Fila 3: Terreno
-    y_r3 = 615
-    draw.text((cx_izq, y_r3), str(datos.get("terreno", "-")), fill=GRIS_OSCURO, font=font_datos_num, anchor="mm")
-    draw.text((cx_izq, y_r3 + 22), "TERRENO m2", fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
-    pegar_icono(lienzo, "terreno", cx_izq, y_r3 + 52)
-
-    draw.line([(30, 695), (260, 695)], fill=GRIS_LINEA, width=2)
-
-    # 3. 4 FOTOS EN CUADRÍCULA DERECHA
-    x_col1 = 295
-    x_col2 = 685
+    # 3. 4 FOTOGRAFÍAS EN ALTA DEFINICIÓN (CUADRÍCULA NÍTIDA)
+    x_col1 = 330
+    x_col2 = 765
     y_fila1 = 110
-    y_fila2 = 460
-    foto_w, foto_h = 365, 330
+    y_fila2 = 505
+    foto_w, foto_h = 405, 365
 
     posiciones = [
         (x_col1, y_fila1),
@@ -299,48 +336,46 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 4. FOTO INDIVIDUAL DEL ASESOR
+    # 4. TARJETA INFERIOR DEL ASESOR
     foto_ruta = asesor_datos.get("foto", "")
     if foto_ruta and os.path.exists(foto_ruta):
         try:
             foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
-            # Proporción para la tarjeta
-            foto_asesor.thumbnail((160, 180), PILImage.Resampling.LANCZOS)
-            draw.rounded_rectangle([(35, 750), (205, 950)], radius=12, outline=(255, 182, 193), width=4)
-            lienzo.paste(foto_asesor, (40, 755), mask=foto_asesor if "A" in foto_asesor.getbands() else None)
+            foto_asesor.thumbnail((180, 200), PILImage.Resampling.LANCZOS)
+            draw.rounded_rectangle([(35, 930), (225, 1150)], radius=14, outline=(254, 205, 211), width=4)
+            px = int(35 + (190 - foto_asesor.width) / 2)
+            py = int(930 + (220 - foto_asesor.height) / 2)
+            lienzo.paste(foto_asesor, (px, py), mask=foto_asesor if "A" in foto_asesor.getbands() else None)
         except Exception:
             pass
 
     # 5. CONTACTO CENTRAL INFERIOR
-    cx_contacto = 510
-    draw.text((cx_contacto, 825), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_bold, anchor="mm")
-    draw.text((cx_contacto, 865), asesor_datos.get("telefono", ""), fill=(80, 80, 80), font=font_pie_tel, anchor="mm")
-    draw.text((cx_contacto, 905), "ASESOR INMOBILIARIO ASOCIADO", fill=(120, 120, 120), font=font_pie_sub, anchor="mm")
-    
-    # Lema personalizado
-    lema_texto = f'"{asesor_datos.get("lema", "")}"'
-    draw.text((cx_contacto, 940), lema_texto, fill=(100, 116, 139), font=font_lema, anchor="mm")
+    cx_contacto = 570
+    draw.text((cx_contacto, 990), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_bold, anchor="mm")
+    draw.text((cx_contacto, 1035), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
+    draw.text((cx_contacto, 1075), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_sub, anchor="mm")
+    draw.text((cx_contacto, 1115), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_lema, anchor="mm")
 
-    # 6. LOGO NEXT EN LA ESQUINA INFERIOR DERECHA
+    # 6. LOGO NEXT INFERIOR DERECHO
     if os.path.exists(LOGO_PATH):
         try:
             logo = PILImage.open(LOGO_PATH).convert("RGBA")
-            logo.thumbnail((240, 100), PILImage.Resampling.LANCZOS)
-            lienzo.paste(logo, (770, 835), mask=logo if "A" in logo.getbands() else None)
+            logo.thumbnail((260, 120), PILImage.Resampling.LANCZOS)
+            lienzo.paste(logo, (880, 1000), mask=logo if "A" in logo.getbands() else None)
         except Exception:
             pass
 
     buf = io.BytesIO()
-    lienzo.save(buf, format="JPEG", quality=95)
+    lienzo.save(buf, format="JPEG", quality=100, subsampling=0)
     buf.seek(0)
     return buf.getvalue()
 
 # ==========================================
-# INTERFAZ STREAMLIT
+# INTERFAZ STREAMLIT LIMPIA (SIN CAMPOS MANUALES)
 # ==========================================
 
-st.title("🖼️ Generador de Post Cuadrado para Redes")
-st.write("Pega el enlace de la propiedad para extraer los datos y seleccionar qué foto va en cada posición:")
+st.title("🖼️ Generador de Post Cuadrado para Redes (1200x1200)")
+st.write("Ingresa el enlace de la propiedad para extraer los datos automáticamente y seleccionar las 4 fotos:")
 
 if "datos_extraidos" not in st.session_state:
     st.session_state.datos_extraidos = None
@@ -354,31 +389,31 @@ with col_as:
     asesor_seleccionado = st.selectbox("Selecciona Asesor:", options=list(ASESORES.keys()), index=0)
 
 info_asesor = ASESORES[asesor_seleccionado]
-st.caption(f"📲 Teléfono asignado: **{info_asesor['telefono']}** | Lema: *\"{info_asesor['lema']}\"*")
+st.caption(f"📲 Contacto: **{info_asesor['telefono']}** | Lema: *\"{info_asesor['lema']}\"*")
 
-if st.button("🔍 Extraer Información y Catálogo de Fotos", type="primary"):
+if st.button("🔍 Extraer Propiedad y Fotos", type="primary"):
     if not url_input.strip().startswith("http"):
-        st.error("Por favor ingresa un enlace válido.")
+        st.error("Por favor ingresa un enlace válido de Next Bienes Raíces.")
     elif not API_KEY:
-        st.error("Falta configurar GEMINI_API_KEY en los Secrets.")
+        st.error("Falta configurar GEMINI_API_KEY en Secrets.")
     else:
-        with st.spinner("Analizando portal y extrayendo fotos..."):
+        with st.spinner("Analizando inmueble y extrayendo catálogo..."):
             try:
                 og_t, og_d, b_txt, fotos = extraer_datos_inmueble(url_input.strip())
                 datos = procesar_con_ia(url_input.strip(), og_t, og_d, b_txt)
                 st.session_state.datos_extraidos = datos
                 st.session_state.fotos_extraidas = fotos
-                st.success(f"¡Propiedad analizada! Se encontraron {len(fotos)} imágenes.")
+                st.success(f"¡Propiedad extraída con éxito! ({datos.get('linea1', '')} - {datos.get('precio', '')})")
             except Exception as e:
-                st.error(f"Error en la extracción: {e}")
+                st.error(f"Error al analizar el portal: {e}")
 
 # ==========================================
-# PASO 2: ASIGNACIÓN VISUAL DE FOTOS
+# ASIGNACIÓN DE FOTOS Y GENERACIÓN DIRECTA
 # ==========================================
 if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
     st.markdown("---")
-    st.subheader("📸 Selecciona las 4 fotos para el Post")
-    
+    st.subheader("📸 Selecciona las 4 fotos que compondrán el post:")
+
     fotos = st.session_state.fotos_extraidas
     cols_preview = st.columns(min(6, len(fotos)))
     for idx, f_url in enumerate(fotos):
@@ -389,49 +424,31 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        f1_idx = st.selectbox("1. Principal (Arriba Izq):", opciones, index=0)
+        f1_idx = st.selectbox("1. Fachada / Principal (Arr. Izq):", opciones, index=0)
     with c2:
-        f2_idx = st.selectbox("2. Detalle (Arriba Der):", opciones, index=min(1, len(fotos)-1))
+        f2_idx = st.selectbox("2. Sala / Cocina (Arr. Der):", opciones, index=min(1, len(fotos)-1))
     with c3:
-        f3_idx = st.selectbox("3. Interior (Abajo Izq):", opciones, index=min(2, len(fotos)-1))
+        f3_idx = st.selectbox("3. Comedor / Recámara (Abj. Izq):", opciones, index=min(2, len(fotos)-1))
     with c4:
-        f4_idx = st.selectbox("4. Espacio (Abajo Der):", opciones, index=min(3, len(fotos)-1))
+        f4_idx = st.selectbox("4. Detalle / Baño (Abj. Der):", opciones, index=min(3, len(fotos)-1))
 
     st.markdown("---")
-    st.subheader("✏️ Verificar Datos del Inmueble")
-    datos = st.session_state.datos_extraidos
     
-    cd1, cd2, cd3, cd4 = st.columns(4)
-    with cd1:
-        datos["colonia"] = st.text_input("Colonia/Fracc:", value=datos.get("colonia", ""))
-        datos["subtitulo"] = st.text_input("Subtítulo (ej: RESIDENCIAL):", value=datos.get("subtitulo", ""))
-    with cd2:
-        datos["tipo_inmueble"] = st.text_input("Tipo:", value=datos.get("tipo_inmueble", "CASAS"))
-        datos["operacion"] = st.selectbox("Operación:", ["Renta", "Venta"], index=0 if datos.get("operacion") == "Renta" else 1)
-    with cd3:
-        datos["precio"] = st.text_input("Precio:", value=datos.get("precio", "$0"))
-        datos["moneda"] = st.text_input("Moneda:", value=datos.get("moneda", "MXN"))
-    with cd4:
-        datos["recamaras"] = st.text_input("Recámaras:", value=datos.get("recamaras", "3"))
-        datos["estacionamiento"] = st.text_input("Estac.:", value=datos.get("estacionamiento", "2"))
-        datos["banos"] = st.text_input("Baños:", value=datos.get("banos", "2"))
-        datos["pisos"] = st.text_input("Pisos:", value=datos.get("pisos", "2"))
-        datos["terreno"] = st.text_input("Terreno m2:", value=datos.get("terreno", "128"))
-
-    if st.button("✨ Generar Flyer Cuadrado JPG", type="primary", use_container_width=True):
+    if st.button("✨ Generar Flyer Cuadrado JPG (Ultra HD)", type="primary", use_container_width=True):
         urls_seleccionadas = [
             fotos[f1_idx - 1],
             fotos[f2_idx - 1],
             fotos[f3_idx - 1],
             fotos[f4_idx - 1]
         ]
-        with st.spinner("Ensamblando imagen en alta resolución..."):
+        with st.spinner("Componiendo imagen nítida en alta resolución..."):
+            datos = st.session_state.datos_extraidos
             img_resultado = generar_flyer_cuadrado(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
-            st.image(img_resultado, caption="Resultado Final", use_container_width=True)
-            
-            nombre_archivo = f"Post_{datos['colonia'].replace(' ', '_')}_{asesor_seleccionado.split()[0]}.jpg"
+            st.image(img_resultado, caption="Vista Previa de Alta Resolución", use_container_width=True)
+
+            nombre_archivo = f"Post_{datos.get('linea1', 'Propiedad').replace(' ', '_')}_{asesor_seleccionado.split()[0]}.jpg"
             st.download_button(
-                label="📥 Descargar Imagen JPG (1080x1080)",
+                label="📥 Descargar Flyer JPG (1200x1200)",
                 data=img_resultado,
                 file_name=nombre_archivo,
                 mime="image/jpeg",
