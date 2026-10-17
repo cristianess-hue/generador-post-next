@@ -29,7 +29,6 @@ ASESORES = {
     }
 }
 
-# Diccionario flexible: busca tanto el nombre descriptivo como el número directo
 ICONOS = {
     "recamaras": ["ico_cama.png", "1.png"],
     "banos": ["ico_bano.png", "2.png"],
@@ -132,7 +131,7 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
     Texto: {body_text[:6000]}
 
     Instrucciones estrictas:
-    1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "PRAGA RESIDENCIAL", "SANTA FE", "MONTECARLO").
+    1. 'colonia': Nombre del fraccionamiento, plaza o colonia (ej: "Santa Fe", "Praga Residencial", "Montecarlo").
     2. 'tipo_inmueble': "Casa", "Departamento", "Oficina", "Local Comercial", "Bodega" o "Terreno".
     3. 'operacion': "Renta" o "Venta".
     4. 'precio': El precio con formato SIN CENTAVOS (ej: "$10,000", "$3,100,000"). NUNCA pongas .00.
@@ -143,11 +142,10 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
     9. 'pisos': Número de niveles o pisos (ej: "1", "2"). Si NO tiene o no se menciona, pon "".
     10. 'construccion': Número de m² de construcción si se menciona (ej: "192", "71"). Si NO tiene, pon "".
     11. 'terreno': Número de m² de terreno si se menciona (ej: "148", "250"). Si NO tiene, pon "".
-    12. 'nombre_archivo': EXACTAMENTE "[tipo_inmueble] en [colonia] [precio]" (ej: "Oficina en Santa Fe $3,100,000"). Sin caracteres ilegales como / \\ : * ? " < > |.
 
     Devuelve un JSON estrictamente válido:
     {{
-      "colonia": "SANTA FE",
+      "colonia": "Santa Fe",
       "tipo_inmueble": "Oficina",
       "operacion": "Venta",
       "precio": "$3,100,000",
@@ -157,8 +155,7 @@ def procesar_con_ia(url, og_title, og_desc, body_text):
       "banos": "",
       "pisos": "",
       "construccion": "71",
-      "terreno": "",
-      "nombre_archivo": "Oficina en Santa Fe $3,100,000"
+      "terreno": ""
     }}
     """
     modelos = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']
@@ -246,10 +243,10 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
 
     # 1. TÍTULO CENTRADO SOBRE LAS FOTOS
     cx_fotos = 750
-    colonia = datos.get("colonia", "PROPIEDAD").upper().strip()
+    colonia = str(datos.get("colonia", "PROPIEDAD")).upper().strip()
     draw.text((cx_fotos, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
 
-    # 2. FILTRAR ÚNICAMENTE CARACTERÍSTICAS VÁLIDAS
+    # 2. FILTRAR CARACTERÍSTICAS VÁLIDAS
     caracteristicas_validas = []
 
     def es_valido(v):
@@ -303,7 +300,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     draw.text((cx_izq, y_cursor - 60), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
     draw.text((cx_izq, y_cursor - 10), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
 
-    # PRECIO: SIN CENTAVOS Y CON AUTO-AJUSTE DE ANCHO
+    # PRECIO: SIN CENTAVOS Y CON AUTO-AJUSTE
     precio_raw = str(datos.get("precio", "$0")).strip()
     precio_limpio = re.sub(r'\.00$', '', precio_raw)
 
@@ -325,7 +322,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     y_linea_base = y_cursor + 120
     draw.line([(30, y_linea_base), (300, y_linea_base)], fill=GRIS_LINEA, width=2)
 
-    # 4. ESPECIFICACIONES CON ICONOS MODERNOS
+    # 4. ESPECIFICACIONES CON CIERRE COMPLETO DE LÍNEAS
     y_actual = y_linea_base
     for fila in filas_specs:
         y_fila_texto = y_actual + gap_fila
@@ -344,6 +341,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             draw.text((cx_izq, y_fila_texto + 28), item_u["label"], fill=GRIS_OSCURO, font=font_datos_lbl, anchor="mm")
             pegar_icono(lienzo, item_u["clave"], cx_izq, y_fila_texto + 70, max_size=52)
 
+        # Cierre inferior de la fila
         y_actual = y_fila_texto + gap_sep
         draw.line([(30, y_actual), (300, y_actual)], fill=GRIS_LINEA, width=2)
 
@@ -477,10 +475,13 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
             img_resultado = generar_flyer_cuadrado(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
             st.image(img_resultado, caption="Vista Previa en Alta Definición", use_container_width=True)
 
-            precio_nombre = re.sub(r'\.00$', '', str(datos.get('precio', ''))).strip()
-            nombre_base = f"{datos.get('tipo_inmueble', 'Inmueble')} en {datos.get('colonia', 'Propiedad')} {precio_nombre}"
-            nombre_limpio = re.sub(r'[\\/*?:"<>|]', "", nombre_base).strip()
-            nombre_archivo = f"{nombre_limpio}.jpg"
+            # Nombre de archivo en formato Title (Tipo en Colonia Precio)
+            tipo_limpio = str(datos.get('tipo_inmueble', 'Inmueble')).strip().capitalize()
+            colonia_limpia = str(datos.get('colonia', 'Propiedad')).strip().title()
+            precio_limpio = re.sub(r'\.00$', '', str(datos.get('precio', ''))).strip()
+
+            nombre_base = f"{tipo_limpio} en {colonia_limpia} {precio_limpio}"
+            nombre_archivo = f"{re.sub(r'[\\/*?:\"<>|]', '', nombre_base).strip()}.jpg"
 
             st.download_button(
                 label=f"📥 Descargar {nombre_archivo}",
