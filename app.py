@@ -118,13 +118,13 @@ def extraer_datos_inmueble(url):
     return og_title, og_desc, body_text, imagenes
 
 # ==========================================
-# ESTRUCTURACIÓN CON IA (DATOS + COPY)
+# ESTRUCTURACIÓN CON IA (DATOS + COPIES)
 # ==========================================
 
 def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel):
     client = genai.Client(api_key=API_KEY)
     prompt = f"""
-    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y redacta un copy comercial limpio para WhatsApp:
+    Eres un analista inmobiliario profesional. Extrae los datos exactos del inmueble y redacta dos versiones de la descripción:
     URL: {url}
     Título: {og_title}
     Descripción: {og_desc}
@@ -143,29 +143,29 @@ def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel
     9. 'pisos': Número de niveles o pisos (ej: "1", "2"). Si NO tiene o no se menciona, pon "".
     10. 'construccion': Número de m² de construcción si se menciona (ej: "192", "71"). Si NO tiene, pon "".
     11. 'terreno': Número de m² de terreno si se menciona (ej: "148", "250"). Si NO tiene, pon "".
-    12. 'copy_publicitario': Redacta el texto estructurado para WhatsApp con emojis, respetando al 100% la información original sin inventar detalles.
-        Debe seguir esta estructura:
+    12. 'copy_publicitario': Redacta el texto para WhatsApp con emojis respetando estrictamente la información sin inventar detalles:
         🏡 *[TIPO] EN [OPERACIÓN] | [COLONIA]*
         💰 *Precio:* [PRECIO] [MONEDA]
         
-        📐 *Superficie y Medidas:*
-        (Menciona terreno y construcción si existen)
+        📐 *Superficie:*
+        (Terreno y construcción si existen)
         
-        ✨ *Distribución y Espacios:*
-        (Puntos limpios con viñetas • sobre plantas, recámaras, baños, estac.)
+        ✨ *Distribución:*
+        (Viñetas con • sobre niveles, recámaras, baños, estac.)
         
         ⚡ *Equipamiento:*
-        (Detalla todo el equipamiento que venga en el texto)
+        (Detalla todo el equipamiento del texto)
         
         🌳 *Área Común / Privada:*
-        (Si tiene amenidades, canchas, alberca, acceso controlado)
+        (Si tiene amenidades)
         
         🛡️ *Estatus Legal:*
-        (Si menciona libre de gravamen o gravamen)
+        (Si menciona estatus)
         
         📲 *Más información y citas:*
         *{asesor_nombre}* - Next Bienes Raíces
         WhatsApp: https://wa.me/52{asesor_tel}
+    13. 'texto_ficha_grafica': El mismo resumen técnico pero SIN emojis ni enlaces web, organizado en párrafos concisos para estampar en la segunda imagen (Ficha Técnica).
 
     Devuelve un JSON estrictamente válido:
     {{
@@ -180,7 +180,8 @@ def procesar_con_ia(url, og_title, og_desc, body_text, asesor_nombre, asesor_tel
       "pisos": "",
       "construccion": "71",
       "terreno": "",
-      "copy_publicitario": "..."
+      "copy_publicitario": "...",
+      "texto_ficha_grafica": "..."
     }}
     """
     modelos = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3.5-flash-lite']
@@ -241,10 +242,10 @@ def pegar_icono(lienzo, clave_icono, x_centro, y_centro, max_size=52):
             pass
 
 # ==========================================
-# GENERADOR GRÁFICO (1200x1200 px HD)
+# BASE COMÚN GRÁFICA (COLUMNA IZQ Y PIE)
 # ==========================================
 
-def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
+def renderizar_base_flyer(datos, asesor_nombre, asesor_datos):
     ancho, alto = 1200, 1200
     lienzo = PILImage.new("RGB", (ancho, alto), (255, 255, 255))
     draw = ImageDraw.Draw(lienzo)
@@ -266,12 +267,12 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     GRIS_OSCURO = (30, 41, 59)
     GRIS_LINEA = (226, 232, 240)
 
-    # 1. TÍTULO CENTRADO SOBRE LAS FOTOS
-    cx_fotos = 750
+    # 1. TÍTULO CENTRADO SOBRE LA ZONA DERECHA
+    cx_zona_der = 750
     colonia = str(datos.get("colonia", "PROPIEDAD")).upper().strip()
-    draw.text((cx_fotos, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
+    draw.text((cx_zona_der, 50), colonia, fill=ROJO_NEXT, font=font_colonia, anchor="mm")
 
-    # 2. FILTRAR CARACTERÍSTICAS VÁLIDAS
+    # 2. ESPECIFICACIONES VÁLIDAS
     caracteristicas_validas = []
 
     def es_valido(v):
@@ -301,7 +302,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             filas_specs.append([caracteristicas_validas[idx_spec]])
             idx_spec += 1
 
-    # 3. DISTRIBUCIÓN VERTICAL EQUILIBRADA EN COLUMNA IZQUIERDA
     cx_izq = 165
     num_filas = len(filas_specs)
 
@@ -325,7 +325,7 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     draw.text((cx_izq, y_cursor - 60), datos.get("tipo_inmueble", "CASA").upper(), fill=GRIS_OSCURO, font=font_tipo, anchor="mm")
     draw.text((cx_izq, y_cursor - 10), datos.get("operacion", "Renta"), fill=ROJO_NEXT, font=font_operacion, anchor="mm")
 
-    # PRECIO: SIN CENTAVOS Y CON AUTO-AJUSTE
+    # PRECIO
     precio_raw = str(datos.get("precio", "$0")).strip()
     precio_limpio = re.sub(r'\.00$', '', precio_raw)
 
@@ -347,7 +347,6 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
     y_linea_base = y_cursor + 120
     draw.line([(30, y_linea_base), (300, y_linea_base)], fill=GRIS_LINEA, width=2)
 
-    # 4. ESPECIFICACIONES CON CIERRE COMPLETO DE LÍNEAS
     y_actual = y_linea_base
     for fila in filas_specs:
         y_fila_texto = y_actual + gap_fila
@@ -369,7 +368,44 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
         y_actual = y_fila_texto + gap_sep
         draw.line([(30, y_actual), (300, y_actual)], fill=GRIS_LINEA, width=2)
 
-    # 5. 4 FOTOS EN ALTA RESOLUCIÓN
+    # 3. TARJETA INFERIOR ASESOR
+    foto_ruta = asesor_datos.get("foto", "")
+    if foto_ruta and os.path.exists(foto_ruta):
+        try:
+            foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
+            foto_asesor.thumbnail((210, 240), PILImage.Resampling.LANCZOS)
+            draw.rounded_rectangle([(30, 910), (245, 1165)], radius=16, outline=(254, 205, 211), width=4)
+            px = int(30 + (215 - foto_asesor.width) / 2)
+            py = int(910 + (255 - foto_asesor.height) / 2)
+            lienzo.paste(foto_asesor, (px, py), mask=foto_asesor if "A" in foto_asesor.getbands() else None)
+        except Exception:
+            pass
+
+    # 4. CONTACTO CENTRAL INFERIOR
+    cx_contacto = 560
+    draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
+    draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
+    draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
+    draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
+
+    # 5. LOGO NEXT
+    if os.path.exists(LOGO_PATH):
+        try:
+            logo = PILImage.open(LOGO_PATH).convert("RGBA")
+            logo.thumbnail((320, 150), PILImage.Resampling.LANCZOS)
+            lienzo.paste(logo, (840, 980), mask=logo if "A" in logo.getbands() else None)
+        except Exception:
+            pass
+
+    return lienzo
+
+# ==========================================
+# GENERADOR 1: FLYER DE PORTADA (CON 4 FOTOS)
+# ==========================================
+
+def generar_flyer_portada(datos, urls_4_fotos, asesor_nombre, asesor_datos):
+    lienzo = renderizar_base_flyer(datos, asesor_nombre, asesor_datos)
+
     x_col1 = 330
     x_col2 = 765
     y_fila1 = 118
@@ -389,34 +425,70 @@ def generar_flyer_cuadrado(datos, urls_4_fotos, asesor_nombre, asesor_datos):
             if img_rec:
                 lienzo.paste(img_rec, posiciones[idx])
 
-    # 6. TARJETA INFERIOR DEL ASESOR
-    foto_ruta = asesor_datos.get("foto", "")
-    if foto_ruta and os.path.exists(foto_ruta):
-        try:
-            foto_asesor = PILImage.open(foto_ruta).convert("RGBA")
-            foto_asesor.thumbnail((210, 240), PILImage.Resampling.LANCZOS)
-            draw.rounded_rectangle([(30, 910), (245, 1165)], radius=16, outline=(254, 205, 211), width=4)
-            px = int(30 + (215 - foto_asesor.width) / 2)
-            py = int(910 + (255 - foto_asesor.height) / 2)
-            lienzo.paste(foto_asesor, (px, py), mask=foto_asesor if "A" in foto_asesor.getbands() else None)
-        except Exception:
-            pass
+    buf = io.BytesIO()
+    lienzo.save(buf, format="JPEG", quality=100, subsampling=0)
+    buf.seek(0)
+    return buf.getvalue()
 
-    # 7. CONTACTO CENTRAL INFERIOR
-    cx_contacto = 560
-    draw.text((cx_contacto, 975), asesor_nombre.upper(), fill=ROJO_NEXT, font=font_pie_nombre, anchor="mm")
-    draw.text((cx_contacto, 1025), asesor_datos.get("telefono", ""), fill=(51, 65, 85), font=font_pie_tel, anchor="mm")
-    draw.text((cx_contacto, 1070), "ASESOR INMOBILIARIO ASOCIADO", fill=(100, 116, 139), font=font_pie_cargo, anchor="mm")
-    draw.text((cx_contacto, 1110), f'"{asesor_datos.get("lema", "")}"', fill=(148, 163, 184), font=font_pie_lema, anchor="mm")
+# ==========================================
+# GENERADOR 2: FICHA TÉCNICA (CON TEXTO ESTRUCTURADO)
+# ==========================================
 
-    # 8. LOGO NEXT EN ESQUINA INFERIOR DERECHA
-    if os.path.exists(LOGO_PATH):
-        try:
-            logo = PILImage.open(LOGO_PATH).convert("RGBA")
-            logo.thumbnail((320, 150), PILImage.Resampling.LANCZOS)
-            lienzo.paste(logo, (840, 980), mask=logo if "A" in logo.getbands() else None)
-        except Exception:
-            pass
+def generar_flyer_ficha(datos, asesor_nombre, asesor_datos):
+    lienzo = renderizar_base_flyer(datos, asesor_nombre, asesor_datos)
+    draw = ImageDraw.Draw(lienzo)
+
+    # Panel contenedor de texto donde iban las fotos
+    x_ini, y_ini = 330, 118
+    x_fin, y_fin = 1170, 873
+    ancho_panel = x_fin - x_ini
+
+    # Fondo suave para la ficha técnica
+    draw.rounded_rectangle([(x_ini, y_ini), (x_fin, y_fin)], radius=16, fill=(248, 250, 252), outline=(226, 232, 240), width=2)
+    
+    # Encabezado del contenedor
+    draw.rounded_rectangle([(x_ini, y_ini), (x_fin, y_ini + 60)], radius=16, fill=(241, 245, 249))
+    draw.rectangle([(x_ini, y_ini + 35), (x_fin, y_ini + 60)], fill=(241, 245, 249)) # Cuadrar esquinas inferiores
+    draw.line([(x_ini, y_ini + 60), (x_fin, y_ini + 60)], fill=(226, 232, 240), width=2)
+
+    font_header_ficha = cargar_fuente(26, bold=True)
+    draw.text((x_ini + 25, y_ini + 30), "FICHA TÉCNICA Y DETALLES DEL INMUEBLE", fill=(30, 41, 59), font=font_header_ficha, anchor="lm")
+
+    # Renderizado y ajuste de texto
+    font_seccion = cargar_fuente(22, bold=True)
+    font_cuerpo = cargar_fuente(20, bold=False)
+
+    texto_ficha = datos.get("texto_ficha_grafica", "")
+    lineas_raw = [l.strip() for l in texto_ficha.split("\n") if l.strip()]
+
+    y_pos = y_ini + 85
+    max_w_texto = ancho_panel - 60
+
+    for linea in lineas_raw:
+        # Detectar si es un subtítulo
+        es_subtitulo = any(linea.lower().startswith(s) for s in ["superficie", "distribución", "equipamiento", "área común", "estatus", "detalles", "amenidades"]) or linea.isupper()
+        
+        fuente_actual = font_seccion if es_subtitulo else font_cuerpo
+        color_actual = (227, 6, 19) if es_subtitulo else (51, 65, 85)
+
+        # Ajuste de línea automático (Word wrap)
+        palabras = linea.split(" ")
+        linea_parcial = ""
+
+        for pal in palabras:
+            prueba = f"{linea_parcial} {pal}".strip()
+            bbox = draw.textbbox((0, 0), prueba, font=fuente_actual)
+            if (bbox[2] - bbox[0]) <= max_w_texto:
+                linea_parcial = prueba
+            else:
+                if y_pos < y_fin - 35:
+                    draw.text((x_ini + 30, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
+                    y_pos += 30 if not es_subtitulo else 34
+                linea_parcial = pal
+
+        if linea_parcial and y_pos < y_fin - 35:
+            draw.text((x_ini + 30, y_pos), linea_parcial, fill=color_actual, font=fuente_actual)
+            y_pos += 36 if es_subtitulo else 30
 
     buf = io.BytesIO()
     lienzo.save(buf, format="JPEG", quality=100, subsampling=0)
@@ -431,10 +503,14 @@ if "datos_extraidos" not in st.session_state:
     st.session_state.datos_extraidos = None
 if "fotos_extraidas" not in st.session_state:
     st.session_state.fotos_extraidas = []
-if "img_generada" not in st.session_state:
-    st.session_state.img_generada = None
-if "nombre_descarga" not in st.session_state:
-    st.session_state.nombre_descarga = ""
+if "img_portada" not in st.session_state:
+    st.session_state.img_portada = None
+if "img_ficha" not in st.session_state:
+    st.session_state.img_ficha = None
+if "nombre_portada" not in st.session_state:
+    st.session_state.nombre_portada = ""
+if "nombre_ficha" not in st.session_state:
+    st.session_state.nombre_ficha = ""
 if "copy_publicitario" not in st.session_state:
     st.session_state.copy_publicitario = ""
 
@@ -442,8 +518,8 @@ if "copy_publicitario" not in st.session_state:
 # INTERFAZ STREAMLIT
 # ==========================================
 
-st.title("🖼️ Generador de Post Cuadrado para Redes (1200x1200)")
-st.write("Pega el enlace de la propiedad para extraer los datos automáticamente, seleccionar las fotos y obtener el copy publicitario:")
+st.title("🖼️ Generador Dual de Posts Cuadrados (1200x1200)")
+st.write("Genera simultáneamente la **Foto 1 (Portada con fotos)** y la **Foto 2 (Ficha Técnica Gráfica)**:")
 
 col_url, col_as = st.columns([2, 1])
 with col_url:
@@ -468,21 +544,20 @@ if st.button("🔍 Extraer Propiedad y Fotos", type="primary"):
                 st.session_state.datos_extraidos = datos
                 st.session_state.fotos_extraidas = fotos
                 st.session_state.copy_publicitario = datos.get("copy_publicitario", "")
-                st.session_state.img_generada = None
-                st.session_state.nombre_descarga = ""
+                st.session_state.img_portada = None
+                st.session_state.img_ficha = None
                 
                 st.success(f"¡Propiedad analizada con éxito! ({datos.get('tipo_inmueble', '')} en {datos.get('colonia', '')} - {datos.get('precio', '')})")
             except Exception as e:
                 st.error(f"Error al analizar el portal: {e}")
 
 # ==========================================
-# ASIGNACIÓN DE FOTOS Y GENERACIÓN
+# SELECCIÓN DE FOTOS Y GENERACIÓN DUAL
 # ==========================================
 if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
     st.markdown("---")
-    st.subheader("📸 Selecciona las 4 fotos para el post:")
+    st.subheader("📸 Selecciona las 4 fotos para la Portada:")
 
-    # Cuadrícula ordenada estricta (funciona igual en PC y celular)
     fotos = st.session_state.fotos_extraidas
     num_cols = 3
     for fila_idx in range(0, len(fotos), num_cols):
@@ -507,48 +582,67 @@ if st.session_state.datos_extraidos and st.session_state.fotos_extraidas:
 
     st.markdown("---")
     
-    if st.button("✨ Generar Flyer Cuadrado JPG (Ultra HD)", type="primary", use_container_width=True):
+    if st.button("✨ Generar Ambos Flyers (Portada + Ficha Técnica)", type="primary", use_container_width=True):
         urls_seleccionadas = [
             fotos[f1_idx - 1],
             fotos[f2_idx - 1],
             fotos[f3_idx - 1],
             fotos[f4_idx - 1]
         ]
-        with st.spinner("Componiendo imagen nítida en alta resolución..."):
+        with st.spinner("Componiendo ambas imágenes en ultra alta resolución..."):
             datos = st.session_state.datos_extraidos
-            img_resultado = generar_flyer_cuadrado(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
+            
+            # Generar Portada y Ficha
+            img_p = generar_flyer_portada(datos, urls_seleccionadas, asesor_seleccionado, info_asesor)
+            img_f = generar_flyer_ficha(datos, asesor_seleccionado, info_asesor)
             
             tipo_limpio = str(datos.get('tipo_inmueble', 'Inmueble')).strip().capitalize()
             colonia_limpia = str(datos.get('colonia', 'Propiedad')).strip().title()
             precio_limpio = re.sub(r'\.00$', '', str(datos.get('precio', ''))).strip()
 
-            nombre_base = f"{tipo_limpio} en {colonia_limpia} {precio_limpio}"
-            nombre_archivo = f"{re.sub(r'[\\/*?:\"<>|]', '', nombre_base).strip()}.jpg"
+            base_nom = f"{tipo_limpio} en {colonia_limpia} {precio_limpio}"
+            base_limpio = re.sub(r'[\\/*?:\"<>|]', '', base_nom).strip()
 
-            st.session_state.img_generada = img_resultado
-            st.session_state.nombre_descarga = nombre_archivo
+            st.session_state.img_portada = img_p
+            st.session_state.nombre_portada = f"{base_limpio} - Portada.jpg"
+
+            st.session_state.img_ficha = img_f
+            st.session_state.nombre_ficha = f"{base_limpio} - Ficha Tecnica.jpg"
 
 # ==========================================
-# RESULTADO PERSISTENTE: IMAGEN + TEXTO LISTO PARA COPIAR
+# RESULTADOS PERSISTENTES (AMBAS IMÁGENES + TEXTO)
 # ==========================================
-if st.session_state.img_generada:
+if st.session_state.img_portada and st.session_state.img_ficha:
     st.markdown("---")
-    st.subheader("🎉 Resultado Final")
+    st.subheader("🎉 Imágenes Listas para Descargar")
 
-    col_img, col_txt = st.columns([1, 1])
+    c_p1, c_p2 = st.columns(2)
 
-    with col_img:
-        st.image(st.session_state.img_generada, caption="Vista Previa (1200x1200 px)", use_container_width=True)
+    with c_p1:
+        st.markdown("#### 🖼️ Foto 1: Portada (4 Fotos)")
+        st.image(st.session_state.img_portada, use_container_width=True)
         st.download_button(
-            label=f"📥 Descargar {st.session_state.nombre_descarga}",
-            data=st.session_state.img_generada,
-            file_name=st.session_state.nombre_descarga,
+            label=f"📥 Descargar {st.session_state.nombre_portada}",
+            data=st.session_state.img_portada,
+            file_name=st.session_state.nombre_portada,
             mime="image/jpeg",
             type="primary",
             use_container_width=True
         )
 
-    with col_txt:
-        st.markdown("#### 📋 Ficha Publicitaria para WhatsApp / Redes")
-        st.caption("Haz clic en el icono de **Copiar** en la esquina superior derecha del recuadro:")
-        st.code(st.session_state.copy_publicitario, language="markdown")
+    with c_p2:
+        st.markdown("#### 📄 Foto 2: Ficha Técnica Gráfica")
+        st.image(st.session_state.img_ficha, use_container_width=True)
+        st.download_button(
+            label=f"📥 Descargar {st.session_state.nombre_ficha}",
+            data=st.session_state.img_ficha,
+            file_name=st.session_state.nombre_ficha,
+            mime="image/jpeg",
+            type="primary",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+    st.markdown("#### 📋 Ficha Publicitaria para WhatsApp / Redes")
+    st.caption("Haz clic en el icono de **Copiar** en la esquina superior derecha del recuadro:")
+    st.code(st.session_state.copy_publicitario, language="markdown")
